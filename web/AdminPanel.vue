@@ -2,9 +2,7 @@
 import { ref } from 'vue'
 import Obelisk from '@/obelisk.js'
 import ComingSoon from './ComingSoon.vue'
-// TASK 8 TODO: uncomment once OrganisationsTab.vue exists, and restore the
-// `<OrganisationsTab v-if="activeTab === 'organisations'" />` branch below.
-// import OrganisationsTab from './OrganisationsTab.vue'
+import OrganisationsTab from './OrganisationsTab.vue'
 
 const TABS = [
   ['players', 'Players'], ['moderation', 'Moderation'], ['organisations', 'Organisations'],
@@ -38,11 +36,8 @@ const close = () => Obelisk.emit('core:client:close', {})
         </button>
       </div>
 
-      <!-- TASK 8 TODO: uncomment the line below once OrganisationsTab.vue exists
-           (and the import at the top of <script setup>), and change the
-           ComingSoon line's v-if to v-else so it stops covering 'organisations'. -->
-      <!-- <OrganisationsTab v-if="activeTab === 'organisations'" /> -->
-      <ComingSoon :label="TABS.find(([k]) => k === activeTab)[1]" />
+      <OrganisationsTab v-if="activeTab === 'organisations'" />
+      <ComingSoon v-else :label="TABS.find(([k]) => k === activeTab)[1]" />
     </div>
   </div>
 </template>
