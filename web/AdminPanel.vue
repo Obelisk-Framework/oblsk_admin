@@ -1,0 +1,48 @@
+<script setup>
+import { ref } from 'vue'
+import Obelisk from '@/obelisk.js'
+import ComingSoon from './ComingSoon.vue'
+// TASK 8 TODO: uncomment once OrganisationsTab.vue exists, and restore the
+// `<OrganisationsTab v-if="activeTab === 'organisations'" />` branch below.
+// import OrganisationsTab from './OrganisationsTab.vue'
+
+const TABS = [
+  ['players', 'Players'], ['moderation', 'Moderation'], ['organisations', 'Organisations'],
+  ['vehicles', 'Vehicles'], ['interactions', 'Interactions'], ['blips', 'Blips'],
+  ['locations', 'Locations'], ['items', 'Items'], ['economy', 'Economy'],
+  ['server', 'Server'], ['audit', 'Audit log'],
+]
+
+const activeTab = ref('organisations')
+
+// 'core:client:close' is the framework-wide close NUI callback (WebView.on
+// in core's client/main.lua calls WebView.closeAll() for it) -- the same
+// path ESC already takes, so no plugin-local visibility state is needed.
+const close = () => Obelisk.emit('core:client:close', {})
+</script>
+
+<template>
+  <div class="absolute inset-0 flex flex-col" style="padding: 2.5vh 2vw">
+    <div class="flex-1 rounded-2xl border border-white/12 bg-[#0d1012] shadow-2xl overflow-hidden flex flex-col">
+      <div class="h-14 px-5 flex items-center justify-between border-b border-white/8 shrink-0">
+        <div class="text-[14px] font-semibold">Staff Panel</div>
+        <button @click="close" class="h-8 px-3 rounded-lg border border-white/12 text-[11.5px] hover:bg-white/8">Close</button>
+      </div>
+
+      <div class="h-11 px-5 flex items-center gap-1 border-b border-white/8 shrink-0 overflow-x-auto">
+        <button v-for="[key, label] in TABS" :key="key" @click="activeTab = key"
+          class="px-3 py-1.5 rounded-lg text-[12px] transition whitespace-nowrap"
+          :class="activeTab === key ? 'text-black font-medium' : 'text-white/45 hover:text-white hover:bg-white/8'"
+          :style="activeTab === key ? { background: 'var(--ob-accent)' } : undefined">
+          {{ label }}
+        </button>
+      </div>
+
+      <!-- TASK 8 TODO: uncomment the line below once OrganisationsTab.vue exists
+           (and the import at the top of <script setup>), and change the
+           ComingSoon line's v-if to v-else so it stops covering 'organisations'. -->
+      <!-- <OrganisationsTab v-if="activeTab === 'organisations'" /> -->
+      <ComingSoon :label="TABS.find(([k]) => k === activeTab)[1]" />
+    </div>
+  </div>
+</template>
