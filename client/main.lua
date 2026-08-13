@@ -5,22 +5,30 @@
 --- `panelOpen` locally and only focus when actually opening, using
 --- showGlobalElement/hideGlobalElement instead of toggling blindly.
 ---
---- Known limitation: a bare ESC-close (core's global ESC watcher, not this
---- plugin's own close button) has no Lua-side notification, so `panelOpen`
---- can drift to true after an ESC-close. The next keybind press will then
---- try to "close" an already-hidden panel -- a harmless no-op
---- (hideGlobalElement on something already hidden) -- rather than opening
---- it. A real fix needs a core framework query API for global-element
---- visibility; out of scope for this fix pass.
+--- Both close paths also call WebView.hide() (not just hideGlobalElement)
+--- so NUI focus is actually released -- hideGlobalElement is a pure
+--- SendNUIMessage with no setFocus call, so without this the player was
+--- left with a cursor and no UI to click on.
+---
+--- ESC (core's global watcher) closes the panel with no Lua-side
+--- notification, so `panelOpen` can drift to true after an ESC-close.
+--- Resynced here on every keybind press via IsNuiFocused(): ESC always
+--- drops focus, so if we think the panel is open but focus is gone, it was
+--- closed by ESC and the next press should open it, not try to close it.
 local panelOpen = false
 
 Obelisk.onClient('admin:client:toggle-panel', function()
+    if panelOpen and not IsNuiFocused() then
+        panelOpen = false
+    end
+
     panelOpen = not panelOpen
     if panelOpen then
         WebView.showGlobalElement('admin')
         WebView.focus()
     else
         WebView.hideGlobalElement('admin')
+        WebView.hide()
     end
 end)
 
@@ -30,6 +38,7 @@ end)
 WebView.on('admin:client:close-panel', function()
     panelOpen = false
     WebView.hideGlobalElement('admin')
+    WebView.hide()
 end)
 
 -- Thin relays: every admin:client:organisations-* NUI event forwards

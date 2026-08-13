@@ -12,9 +12,19 @@ const newContact = ref({ number: '', label: '' })
 
 const selected = computed(() => orgs.value.find(o => o.id === selectedId.value) || orgs.value[0] || null)
 
+// Lua's empty-table-to-JSON serialization produces {} not [], so an org
+// with zero departments/ranks/contact_numbers can arrive as a plain object
+// instead of an array -- .length/.some/.filter on it throws and blanks the
+// whole list. Normalized once here so every template usage stays simple.
+const asArray = (v) => (Array.isArray(v) ? v : [])
 const onReply = ({ orgs: nextOrgs }) => {
-  orgs.value = nextOrgs
-  if (!selectedId.value && nextOrgs.length) selectedId.value = nextOrgs[0].id
+  orgs.value = nextOrgs.map(o => ({
+    ...o,
+    departments: asArray(o.departments),
+    ranks: asArray(o.ranks),
+    contact_numbers: asArray(o.contact_numbers),
+  }))
+  if (!selectedId.value && orgs.value.length) selectedId.value = orgs.value[0].id
 }
 
 onMounted(() => {
@@ -64,17 +74,13 @@ const addRank = (org) => {
 }
 const removeRank = (rankId) => Obelisk.emit('admin:client:organisations-removeRank', { rankId })
 
-// There's no OrganizationService.updateRank/moveRank server handler (a real
-// reorder needs one, plus a matching admin:server:* handler -- out of scope
-// for this fix pass). As a minimal in-scope way to let grades be edited,
-// this deletes and recreates the rank with the same name and the new grade.
-// removeRank's cascade behaviour is already safe by design for this.
-const updateRankGrade = (org, rank, grade) => {
-  const nextGrade = Number(grade)
-  if (Number.isNaN(nextGrade) || nextGrade === rank.grade) return
-  Obelisk.emit('admin:client:organisations-removeRank', { rankId: rank.id })
-  Obelisk.emit('admin:client:organisations-addRank', { orgId: org.id, name: rank.name, grade: nextGrade })
-}
+// Grade is read-only here: there's no OrganizationService.updateRank/moveRank
+// server handler, and a delete+recreate stopgap is NOT safe -- removeRank
+// nulls rank_id on every membership holding that rank and revokes every
+// permission grant attached to it, so "editing" a grade that way silently
+// demotes every member of that rank and wipes their rank-scoped
+// permissions. Add a real updateRank method + admin:server:* handler
+// before making grade editable.
 
 const addContactNumber = (org) => {
   if (!newContact.value.number.trim()) return
@@ -173,8 +179,7 @@ const COLOURS = ['#3b82f6', '#10b981', '#e0b64a', '#f59e0b', '#ef4444', '#a78bfa
         <div class="px-4 py-2.5 border-b border-white/8 text-[12.5px] font-medium">Ranks · {{ selected.ranks.length }}</div>
         <div class="p-3 space-y-1.5 overflow-y-auto" style="max-height: 220px">
           <div v-for="r in selected.ranks" :key="r.id" class="flex items-center gap-2 rounded-lg border border-white/10 bg-black/30 px-2.5 h-9">
-            <input type="number" :value="r.grade" @change="updateRankGrade(selected, r, $event.target.value)"
-              class="ob-mono text-[9px] text-white/60 w-10 shrink-0 h-6 rounded bg-black/40 border border-white/12 outline-none" title="Grade (editing reorders the rank)" />
+            <span class="ob-mono text-[9px] text-white/30 w-6 shrink-0" title="Grade">{{ r.grade }}</span>
             <span class="text-[11.5px] flex-1 truncate">{{ r.name }}</span>
             <button @click="removeRank(r.id)" class="w-6 h-6 rounded text-white/30 hover:text-red-300">×</button>
           </div>
