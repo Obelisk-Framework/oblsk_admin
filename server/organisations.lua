@@ -8,7 +8,7 @@ local function isAdmin(source)
 end
 
 local function replyWithList(source)
-    Obelisk.emitClient(source, 'admin:client:organisations-reply', { orgs = OrganizationService.list() })
+    Obelisk.emitClient('admin:client:organisations-reply', source, { orgs = OrganizationService.list() })
 end
 
 Obelisk.onServer('admin:server:organisations-list', function()
@@ -21,13 +21,19 @@ Obelisk.onServer('admin:server:organisations-create', function(data)
     local source = source
     if not isAdmin(source) then return end
     local orgId = OrganizationService.create(data.name or 'New organisation')
-    OrganizationService.setDetails(orgId, { shortCode = data.shortCode, colour = data.colour, type = data.type or 'Government' })
+    local ok, reason = OrganizationService.setDetails(orgId, { shortCode = data.shortCode, colour = data.colour, type = data.type or 'Government' })
+    if not ok then
+        NotificationService.error(source, 'Organisations', reason)
+    end
     replyWithList(source)
 end)
 
 Obelisk.onServer('admin:server:organisations-setDetails', function(data)
     local source = source
     if not isAdmin(source) then return end
+    if data.name and data.name ~= '' then
+        OrganizationService.rename(data.orgId, data.name)
+    end
     local ok, reason = OrganizationService.setDetails(data.orgId, { shortCode = data.shortCode, colour = data.colour, type = data.type })
     if not ok then
         NotificationService.error(source, 'Organisations', reason)

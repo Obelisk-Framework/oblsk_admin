@@ -13,10 +13,12 @@ const TABS = [
 
 const activeTab = ref('organisations')
 
-// 'core:client:close' is the framework-wide close NUI callback (WebView.on
-// in core's client/main.lua calls WebView.closeAll() for it) -- the same
-// path ESC already takes, so no plugin-local visibility state is needed.
-const close = () => Obelisk.emit('core:client:close', {})
+// Plugin-specific close event: the generic 'core:client:close' NUI callback
+// only hides the raw webview (SetNuiFocus off) and has no effect on this
+// panel's global-element visibility, so it never actually disappears.
+// 'admin:client:close-panel' is handled by this plugin's own
+// client/main.lua, which knows about and resets the local panelOpen state.
+const close = () => Obelisk.emit('admin:client:close-panel', {})
 </script>
 
 <template>

@@ -11,5 +11,5 @@ end
 
 ActionService.register('admin:toggle-panel', function(source, data)
     if not isAdmin(source) then return end
-    Obelisk.emitClient(source, 'admin:client:toggle-panel')
-end, { label = 'Toggle admin panel', default_key = Config.keybind })
+    Obelisk.emitClient('admin:client:toggle-panel', source)
+end, { label = 'Toggle admin panel', default_key = AdminConfig.keybind })

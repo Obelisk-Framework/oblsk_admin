@@ -1,5 +1,5 @@
 <script setup>
-import { ref, computed, onMounted, onBeforeUnmount } from 'vue'
+import { ref, computed, onMounted, onBeforeUnmount, inject, watch } from 'vue'
 import Obelisk from '@/obelisk.js'
 
 const orgs = ref([])
@@ -23,6 +23,18 @@ onMounted(() => {
 })
 onBeforeUnmount(() => Obelisk.off('admin:client:organisations-reply', onReply))
 
+// Global elements use v-show and stay mounted for the webview's lifetime,
+// so onMounted above only ever fires once (on first NUI page load), not
+// each time the admin panel is actually opened. Refetch whenever this
+// component's global-element entry becomes visible, so the list can't go
+// stale across an open/close/open cycle.
+const registry = inject('obelisk:globalElementsRegistry', null)
+if (registry) {
+  watch(() => registry.get('admin')?.visible, (visible) => {
+    if (visible) Obelisk.emit('admin:client:organisations-list', {})
+  })
+}
+
 const createOrg = () => {
   draft.value = { name: '', shortCode: '', colour: '#3b82f6', type: 'Government' }
 }
@@ -33,7 +45,7 @@ const submitCreate = () => {
 
 const setDetails = (org) => {
   Obelisk.emit('admin:client:organisations-setDetails', {
-    orgId: org.id, shortCode: org.short_code, colour: org.colour, type: org.type,
+    orgId: org.id, name: org.name, shortCode: org.short_code, colour: org.colour, type: org.type,
   })
 }
 
@@ -51,6 +63,18 @@ const addRank = (org) => {
   newRankGrade.value = 0
 }
 const removeRank = (rankId) => Obelisk.emit('admin:client:organisations-removeRank', { rankId })
+
+// There's no OrganizationService.updateRank/moveRank server handler (a real
+// reorder needs one, plus a matching admin:server:* handler -- out of scope
+// for this fix pass). As a minimal in-scope way to let grades be edited,
+// this deletes and recreates the rank with the same name and the new grade.
+// removeRank's cascade behaviour is already safe by design for this.
+const updateRankGrade = (org, rank, grade) => {
+  const nextGrade = Number(grade)
+  if (Number.isNaN(nextGrade) || nextGrade === rank.grade) return
+  Obelisk.emit('admin:client:organisations-removeRank', { rankId: rank.id })
+  Obelisk.emit('admin:client:organisations-addRank', { orgId: org.id, name: rank.name, grade: nextGrade })
+}
 
 const addContactNumber = (org) => {
   if (!newContact.value.number.trim()) return
@@ -77,7 +101,7 @@ const COLOURS = ['#3b82f6', '#10b981', '#e0b64a', '#f59e0b', '#ef4444', '#a78bfa
           <span class="w-2 h-8 rounded-full shrink-0" :style="{ background: o.colour || '#6b7280' }" />
           <span class="min-w-0 flex-1">
             <span class="block text-[12px] truncate">{{ o.name }}</span>
-            <span class="block ob-mono text-[9px] text-white/35">{{ o.short_code || '—' }} · {{ o.departments.length }} DEPTS · {{ o.ranks.length }} RANKS</span>
+            <span class="block ob-mono text-[9px] text-white/35 truncate">{{ o.short_code || '—' }} · {{ o.departments.length }} DEPTS · {{ o.ranks.length }} RANKS<template v-if="o.contact_numbers.some(c => c.enabled)"> · {{ o.contact_numbers.filter(c => c.enabled).map(c => c.number).join(', ') }}</template></span>
           </span>
         </button>
         <div v-if="!orgs.length" class="py-6 text-center text-[11.5px] text-white/30">No organisations yet.</div>
@@ -88,9 +112,10 @@ const COLOURS = ['#3b82f6', '#10b981', '#e0b64a', '#f59e0b', '#ef4444', '#a78bfa
       <div class="text-[13px] font-medium">New organisation</div>
       <input v-model="draft.name" placeholder="Name" class="w-full h-9 px-3 rounded-lg bg-black/40 border border-white/12 text-[11.5px] outline-none" />
       <input v-model="draft.shortCode" placeholder="Short code" class="w-full h-9 px-3 rounded-lg bg-black/40 border border-white/12 ob-mono text-[11.5px] outline-none" />
-      <div class="flex gap-1.5">
+      <div class="flex gap-1.5 items-center">
         <button v-for="c in COLOURS" :key="c" @click="draft.colour = c" class="w-7 h-7 rounded-md"
           :style="{ background: c, outline: draft.colour === c ? '2px solid #fff' : '1px solid rgba(255,255,255,.12)' }" />
+        <input type="color" v-model="draft.colour" class="w-7 h-7 rounded-md bg-transparent border border-white/12 cursor-pointer" title="Custom colour" />
       </div>
       <div class="flex gap-1.5">
         <button v-for="t in ['Government', 'Business']" :key="t" @click="draft.type = t"
@@ -119,6 +144,8 @@ const COLOURS = ['#3b82f6', '#10b981', '#e0b64a', '#f59e0b', '#ef4444', '#a78bfa
           <div class="flex gap-1.5 flex-wrap items-center">
             <button v-for="c in COLOURS" :key="c" @click="selected.colour = c; setDetails(selected)" class="w-7 h-7 rounded-md"
               :style="{ background: c, outline: selected.colour === c ? '2px solid #fff' : '1px solid rgba(255,255,255,.12)' }" />
+            <input type="color" :value="selected.colour" @change="selected.colour = $event.target.value; setDetails(selected)"
+              class="w-7 h-7 rounded-md bg-transparent border border-white/12 cursor-pointer" title="Custom colour" />
             <button v-for="t in ['Government', 'Business']" :key="t" @click="selected.type = t; setDetails(selected)"
               class="h-7 px-2 rounded text-[10.5px]"
               :class="selected.type === t ? 'text-black font-medium' : 'bg-white/[0.05] text-white/50'"
@@ -146,7 +173,8 @@ const COLOURS = ['#3b82f6', '#10b981', '#e0b64a', '#f59e0b', '#ef4444', '#a78bfa
         <div class="px-4 py-2.5 border-b border-white/8 text-[12.5px] font-medium">Ranks · {{ selected.ranks.length }}</div>
         <div class="p-3 space-y-1.5 overflow-y-auto" style="max-height: 220px">
           <div v-for="r in selected.ranks" :key="r.id" class="flex items-center gap-2 rounded-lg border border-white/10 bg-black/30 px-2.5 h-9">
-            <span class="ob-mono text-[9px] text-white/30 w-6 shrink-0">{{ r.grade }}</span>
+            <input type="number" :value="r.grade" @change="updateRankGrade(selected, r, $event.target.value)"
+              class="ob-mono text-[9px] text-white/60 w-10 shrink-0 h-6 rounded bg-black/40 border border-white/12 outline-none" title="Grade (editing reorders the rank)" />
             <span class="text-[11.5px] flex-1 truncate">{{ r.name }}</span>
             <button @click="removeRank(r.id)" class="w-6 h-6 rounded text-white/30 hover:text-red-300">×</button>
           </div>
