@@ -59,3 +59,25 @@ end
 Obelisk.onClient('admin:client:organisations-reply', function(payload)
     SendNUIMessage({ eventname = 'admin:client:organisations-reply', args = { payload } })
 end)
+
+-- Thin relays for the Players/Moderation/Vehicles/Items tabs, same pattern
+-- as ORG_RELAYS above: every admin:client:<tab>-<verb> NUI event forwards
+-- verbatim to the matching admin:server:<tab>-<verb> handler.
+local TAB_RELAYS = {
+    'players-list', 'players-teleport-to-player', 'players-bring-player', 'players-kick', 'players-spectate',
+    'moderation-list', 'moderation-ban', 'moderation-unban', 'moderation-warn', 'moderation-kick',
+    'vehicles-list', 'vehicles-delete', 'vehicles-teleport-to-admin',
+    'items-list', 'items-update', 'items-create', 'items-give',
+}
+for _, name in ipairs(TAB_RELAYS) do
+    WebView.on('admin:client:' .. name, function(data)
+        Obelisk.emitServer('admin:server:' .. name, data)
+    end)
+end
+
+local TAB_REPLIES = { 'players-reply', 'moderation-reply', 'vehicles-reply', 'items-reply' }
+for _, name in ipairs(TAB_REPLIES) do
+    Obelisk.onClient('admin:client:' .. name, function(payload)
+        SendNUIMessage({ eventname = 'admin:client:' .. name, args = { payload } })
+    end)
+end
