@@ -7,6 +7,10 @@ local function isAdmin(source)
     return source == 0 or IsPlayerAceAllowed(source, 'admin')
 end
 
+local function accountExists(accountId)
+    return Account:findSync(accountId) ~= nil
+end
+
 local function replyWithLists(source)
     Obelisk.emitClient('admin:client:moderation-reply', source, {
         bans = AccountService.listBans(),
@@ -23,6 +27,11 @@ end)
 Obelisk.onServer('admin:server:moderation-ban', function(data)
     local source = source
     if not isAdmin(source) then return end
+
+    if not accountExists(data.accountId) then
+        NotificationService.error(source, 'Moderation', 'No such account: ' .. tostring(data.accountId))
+        return
+    end
 
     local expiresAt = nil
     if data.durationHours and data.durationHours > 0 then
@@ -52,6 +61,12 @@ end)
 Obelisk.onServer('admin:server:moderation-warn', function(data)
     local source = source
     if not isAdmin(source) then return end
+
+    if not accountExists(data.accountId) then
+        NotificationService.error(source, 'Moderation', 'No such account: ' .. tostring(data.accountId))
+        return
+    end
+
     AccountService.warn(data.accountId, data.reason or 'No reason given', tostring(source))
 
     for _, playerIdStr in ipairs(GetPlayers()) do
@@ -67,6 +82,12 @@ end)
 Obelisk.onServer('admin:server:moderation-kick', function(data)
     local source = source
     if not isAdmin(source) then return end
+
+    if not accountExists(data.accountId) then
+        NotificationService.error(source, 'Moderation', 'No such account: ' .. tostring(data.accountId))
+        return
+    end
+
     AccountService.logKick(data.accountId, data.reason or 'No reason given', tostring(source))
 
     for _, playerIdStr in ipairs(GetPlayers()) do
