@@ -22,7 +22,7 @@ end)
 
 Obelisk.onClient('admin:server:items-create', function(player, data)
     if not isAdmin(player) then return end
-    local id, reason = ItemService.createBaseItem(data.attributes or {})
+    local id, reason = ItemService.createBaseItem(data.attributes or {}, data.bindingKey)
     if not id then
         NotificationService.error(player, 'Items', reason)
     end

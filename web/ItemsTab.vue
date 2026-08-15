@@ -39,9 +39,10 @@ const updateField = (item, field, value) => {
 }
 const toggleFlag = (item, flag) => updateField(item, flag, item[flag] ? 0 : 1)
 
-const openCreate = () => { createDraft.value = { name: '', description: '', weight: 0, max_stack_amount: 1 } }
+const openCreate = () => { createDraft.value = { name: '', description: '', weight: 0, max_stack_amount: 1, bindingKey: '' } }
 const submitCreate = () => {
-  Obelisk.emit('admin:client:items-create', { attributes: createDraft.value })
+  const { bindingKey, ...attributes } = createDraft.value
+  Obelisk.emit('admin:client:items-create', { attributes, bindingKey: bindingKey || null })
   createDraft.value = null
 }
 
@@ -75,6 +76,7 @@ const submitGive = () => {
       <input v-model="createDraft.name" placeholder="Name" class="w-full h-9 px-3 rounded-lg bg-black/40 border border-white/12 text-[11.5px] outline-none" />
       <input v-model="createDraft.description" placeholder="Description" class="w-full h-9 px-3 rounded-lg bg-black/40 border border-white/12 text-[11.5px] outline-none" />
       <input v-model.number="createDraft.weight" type="number" step="0.1" placeholder="Weight" class="w-full h-9 px-3 rounded-lg bg-black/40 border border-white/12 ob-mono text-[11.5px] outline-none" />
+      <input v-model="createDraft.bindingKey" placeholder="Binding key (optional, e.g. fishing.rod)" class="w-full h-9 px-3 rounded-lg bg-black/40 border border-white/12 ob-mono text-[11.5px] outline-none" />
       <div class="flex gap-2">
         <button @click="createDraft = null" class="h-9 px-3.5 rounded-lg border border-white/12 text-[12px]">Cancel</button>
         <button @click="submitCreate" class="h-9 px-4 rounded-lg text-black text-[12px] font-medium" style="background: var(--ob-accent)">Create item</button>
