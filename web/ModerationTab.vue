@@ -57,7 +57,7 @@ const unban = (banId) => Obelisk.emit('admin:client:moderation-unban', { banId }
       <div class="overflow-y-auto" style="max-height: 460px">
         <div v-for="b in bans" :key="b.id" class="px-3.5 py-2.5 border-b border-white/6">
           <div class="flex items-center justify-between">
-            <span class="text-[12px]">{{ b.display_name || ('Account #' + b.account_id) }}</span>
+            <span class="text-[12px]">{{ b.display_name || (b.account_id ? ('Account #' + b.account_id) : (b.identifier_type + ':' + b.identifier_value)) }}</span>
             <button v-if="!b.revoked_at" @click="unban(b.id)" class="ob-mono text-[9px] px-1.5 py-0.5 rounded border border-white/12 hover:bg-white/8">UNBAN</button>
             <span v-else class="ob-mono text-[9px] text-white/30">REVOKED</span>
           </div>
