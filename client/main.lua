@@ -68,6 +68,7 @@ local TAB_RELAYS = {
     'moderation-list', 'moderation-ban', 'moderation-unban', 'moderation-warn', 'moderation-kick',
     'vehicles-list', 'vehicles-delete', 'vehicles-teleport-to-admin',
     'items-list', 'items-update', 'items-create', 'items-give',
+    'printers-list', 'printers-create', 'printers-update', 'printers-delete', 'printers-refill',
 }
 for _, name in ipairs(TAB_RELAYS) do
     WebView.on('admin:client:' .. name, function(data)
@@ -75,7 +76,7 @@ for _, name in ipairs(TAB_RELAYS) do
     end)
 end
 
-local TAB_REPLIES = { 'players-reply', 'moderation-reply', 'vehicles-reply', 'items-reply' }
+local TAB_REPLIES = { 'players-reply', 'moderation-reply', 'vehicles-reply', 'items-reply', 'printers-reply' }
 for _, name in ipairs(TAB_REPLIES) do
     Obelisk.onClient('admin:client:' .. name, function(payload)
         SendNUIMessage({ eventname = 'admin:client:' .. name, args = { payload } })
