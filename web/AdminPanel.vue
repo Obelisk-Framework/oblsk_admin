@@ -3,6 +3,7 @@ import { ref } from 'vue'
 import Obelisk from '@/obelisk.js'
 import ComingSoon from './ComingSoon.vue'
 import OrganisationsTab from './OrganisationsTab.vue'
+import PlayersTab from './PlayersTab.vue'
 
 const TABS = [
   ['players', 'Players'], ['moderation', 'Moderation'], ['organisations', 'Organisations'],
@@ -39,6 +40,7 @@ const close = () => Obelisk.emit('admin:client:close-panel', {})
       </div>
 
       <OrganisationsTab v-if="activeTab === 'organisations'" />
+      <PlayersTab v-else-if="activeTab === 'players'" />
       <ComingSoon v-else :label="TABS.find(([k]) => k === activeTab)[1]" />
     </div>
   </div>
