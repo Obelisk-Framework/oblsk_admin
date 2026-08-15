@@ -2,7 +2,8 @@
 --- oblsk_admin server: Players tab NUI handlers. Reads live server state
 --- (GetPlayers()), not a database table -- there's nothing to persist for
 --- an online-player list.
-local function isAdmin(source)
+local function isAdmin(player)
+    local source = player:getSource()
     return source == 0 or IsPlayerAceAllowed(source, 'admin')
 end
 
@@ -25,47 +26,42 @@ local function listPlayers()
     return rows
 end
 
-local function replyWithList(source)
-    Obelisk.emitClient('admin:client:players-reply', source, { players = listPlayers() })
+local function replyWithList(player)
+    player:emit('admin:client:players-reply', { players = listPlayers() })
 end
 
-Obelisk.onServer('admin:server:players-list', function()
-    local source = source
-    if not isAdmin(source) then return end
-    replyWithList(source)
+Obelisk.onClient('admin:server:players-list', function(player)
+    if not isAdmin(player) then return end
+    replyWithList(player)
 end)
 
-Obelisk.onServer('admin:server:players-teleport-to-player', function(data)
-    local source = source
-    if not isAdmin(source) then return end
+Obelisk.onClient('admin:server:players-teleport-to-player', function(player, data)
+    if not isAdmin(player) then return end
     local targetPed = GetPlayerPed(data.targetSource)
     if targetPed == 0 then return end
     local coords = GetEntityCoords(targetPed)
-    SetEntityCoords(GetPlayerPed(source), coords.x, coords.y, coords.z)
+    SetEntityCoords(GetPlayerPed(player:getSource()), coords.x, coords.y, coords.z)
 end)
 
-Obelisk.onServer('admin:server:players-bring-player', function(data)
-    local source = source
-    if not isAdmin(source) then return end
-    local adminCoords = GetEntityCoords(GetPlayerPed(source))
+Obelisk.onClient('admin:server:players-bring-player', function(player, data)
+    if not isAdmin(player) then return end
+    local adminCoords = GetEntityCoords(GetPlayerPed(player:getSource()))
     local targetPed = GetPlayerPed(data.targetSource)
     if targetPed == 0 then return end
     SetEntityCoords(targetPed, adminCoords.x, adminCoords.y, adminCoords.z)
 end)
 
-Obelisk.onServer('admin:server:players-kick', function(data)
-    local source = source
-    if not isAdmin(source) then return end
+Obelisk.onClient('admin:server:players-kick', function(player, data)
+    if not isAdmin(player) then return end
     local accountId = AccountService.getAccountId(data.targetSource)
     if accountId then
-        AccountService.logKick(accountId, data.reason or 'No reason given', tostring(source))
+        AccountService.logKick(accountId, data.reason or 'No reason given', tostring(player:getSource()))
     end
     DropPlayer(data.targetSource, 'Kicked: ' .. (data.reason or 'No reason given'))
-    replyWithList(source)
+    replyWithList(player)
 end)
 
-Obelisk.onServer('admin:server:players-spectate', function(data)
-    local source = source
-    if not isAdmin(source) then return end
-    NotificationService.info(source, 'Players', 'Spectate mode is not implemented yet.')
+Obelisk.onClient('admin:server:players-spectate', function(player, data)
+    if not isAdmin(player) then return end
+    NotificationService.info(player, 'Players', 'Spectate mode is not implemented yet.')
 end)

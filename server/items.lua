@@ -1,45 +1,45 @@
 -- core/plugins/oblsk_admin/server/items.lua
 --- oblsk_admin server: Items tab NUI handlers.
-local function isAdmin(source)
+local function isAdmin(player)
+    local source = player:getSource()
     return source == 0 or IsPlayerAceAllowed(source, 'admin')
 end
 
-local function replyWithList(source)
-    Obelisk.emitClient('admin:client:items-reply', source, { items = ItemService.listBaseItems() })
+local function replyWithList(player)
+    player:emit('admin:client:items-reply', { items = ItemService.listBaseItems() })
 end
 
-Obelisk.onServer('admin:server:items-list', function()
-    local source = source
-    if not isAdmin(source) then return end
-    replyWithList(source)
+Obelisk.onClient('admin:server:items-list', function(player)
+    if not isAdmin(player) then return end
+    replyWithList(player)
 end)
 
-Obelisk.onServer('admin:server:items-update', function(data)
-    local source = source
-    if not isAdmin(source) then return end
+Obelisk.onClient('admin:server:items-update', function(player, data)
+    if not isAdmin(player) then return end
     ItemService.updateBaseItem(data.baseItemId, data.attributes or {})
-    replyWithList(source)
+    replyWithList(player)
 end)
 
-Obelisk.onServer('admin:server:items-create', function(data)
-    local source = source
-    if not isAdmin(source) then return end
+Obelisk.onClient('admin:server:items-create', function(player, data)
+    if not isAdmin(player) then return end
     local id, reason = ItemService.createBaseItem(data.attributes or {})
     if not id then
-        NotificationService.error(source, 'Items', reason)
+        NotificationService.error(player, 'Items', reason)
     end
-    replyWithList(source)
+    replyWithList(player)
 end)
 
-Obelisk.onServer('admin:server:items-give', function(data)
-    local source = source
-    if not isAdmin(source) then return end
+Obelisk.onClient('admin:server:items-give', function(player, data)
+    if not isAdmin(player) then return end
     local ok, reason = ItemService.giveToPlayer(data.targetSource, data.baseItemId, data.amount)
     if ok then
-        NotificationService.success(source, 'Items', 'Item given.')
-        NotificationService.info(data.targetSource, 'Items', 'You received an item from staff.')
+        NotificationService.success(player, 'Items', 'Item given.')
+        local targetPlayer = PlayerService.get(data.targetSource)
+        if targetPlayer then
+            NotificationService.info(targetPlayer, 'Items', 'You received an item from staff.')
+        end
     else
-        NotificationService.error(source, 'Items', reason)
+        NotificationService.error(player, 'Items', reason)
     end
-    replyWithList(source)
+    replyWithList(player)
 end)
