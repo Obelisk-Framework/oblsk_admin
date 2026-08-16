@@ -1,9 +1,11 @@
 -- core/plugins/oblsk_admin/server/interactions.lua
 --- oblsk_admin server: Interactions tab NUI handlers -- plain `interactions`
---- rows plus the two plugin-owned station types that currently support
---- live admin CRUD (oblsk_gasstation, oblsk_mechanic). Every mutation
---- replies with the full refreshed list, same posture as items.lua/
---- organisations.lua.
+--- rows plus a generic pass-through to whatever interaction types plugins
+--- have registered via core's InteractionTypeService (oblsk_gasstation's
+--- 'gasstation', oblsk_mechanic's 'mechanic', etc). oblsk_admin no longer
+--- has any bespoke knowledge of those plugins' internals -- see
+--- InteractionTypeService.listForAdmin/get. Every mutation replies with the
+--- full refreshed list, same posture as items.lua/organisations.lua.
 local function isAdmin(player)
     local source = player:getSource()
     return source == 0 or IsPlayerAceAllowed(source, 'admin')
@@ -119,52 +121,34 @@ Obelisk.onClient('admin:server:interactions-setEnabled', function(player, data)
 end)
 
 --------------------------------------------------------------------------------
--- Gas stations
+-- Gas stations - only the stock sub-editor stays bespoke (see Part 5's
+-- comment in InteractionsTab.vue for why this wasn't generalized further).
+-- Station list/create/update/delete now go through the generic
+-- interactionType-* handlers below; stock mutations reply through the same
+-- generic 'interactionType-reply' event (typeKey='gasstation') so the
+-- already-generic selected-item panel picks up the refreshed stock list.
 --------------------------------------------------------------------------------
 
-local function replyGasStations(player)
-    player:emit('admin:client:gasstation-reply', { stations = GasStationService.listStationsForAdmin() })
+local function replyGasStationsGeneric(player)
+    player:emit('admin:client:interactionType-reply', { typeKey = 'gasstation', items = GasStationService.listStationsForAdmin() })
 end
-
-Obelisk.onClient('admin:server:gasstation-list', function(player)
-    if not isAdmin(player) then return end
-    replyGasStations(player)
-end)
-
-Obelisk.onClient('admin:server:gasstation-create', function(player, data)
-    if not isAdmin(player) then return end
-    GasStationService.createStation(data)
-    replyGasStations(player)
-end)
-
-Obelisk.onClient('admin:server:gasstation-update', function(player, data)
-    if not isAdmin(player) then return end
-    GasStationService.updateStation(data.stationId, data)
-    replyGasStations(player)
-end)
-
-Obelisk.onClient('admin:server:gasstation-delete', function(player, data)
-    if not isAdmin(player) then return end
-    GasStationService.deleteStation(data.stationId)
-    replyGasStations(player)
-end)
 
 Obelisk.onClient('admin:server:gasstation-stock-add', function(player, data)
     if not isAdmin(player) then return end
     GasStationService.addStock(data.stationId, data)
-    replyGasStations(player)
+    replyGasStationsGeneric(player)
 end)
 
 Obelisk.onClient('admin:server:gasstation-stock-update', function(player, data)
     if not isAdmin(player) then return end
     GasStationService.updateStock(data.stockId, data)
-    replyGasStations(player)
+    replyGasStationsGeneric(player)
 end)
 
 Obelisk.onClient('admin:server:gasstation-stock-remove', function(player, data)
     if not isAdmin(player) then return end
     GasStationService.removeStock(data.stockId)
-    replyGasStations(player)
+    replyGasStationsGeneric(player)
 end)
 
 Obelisk.onClient('admin:server:gasstation-fuelTypes-list', function(player)
@@ -173,32 +157,51 @@ Obelisk.onClient('admin:server:gasstation-fuelTypes-list', function(player)
 end)
 
 --------------------------------------------------------------------------------
--- Mechanic stations
+-- Generic interaction types - dynamic replacement for the old bespoke
+-- gasstation-*/mechanic-* CRUD handlers above. Any plugin that has called
+-- InteractionTypeService.register(...) (oblsk_gasstation, oblsk_mechanic,
+-- future plugins) gets list/create/update/delete for free here, with zero
+-- oblsk_admin-side knowledge of what that type actually is.
+--
+-- `data.fields` carries the type's declared extra fields (see
+-- InteractionTypeService's `fields` schema) merged with the base interaction
+-- fields (x/y/z/range/label) needed to place/move the world prompt -- every
+-- current descriptor's create/update hook expects one flat table containing
+-- both, so no further reshaping happens here.
 --------------------------------------------------------------------------------
 
-local function replyMechanicStations(player)
-    player:emit('admin:client:mechanic-reply', { stations = MechanicService.listStationsForAdmin() })
-end
-
-Obelisk.onClient('admin:server:mechanic-list', function(player)
+Obelisk.onClient('admin:server:interactionTypes-list', function(player)
     if not isAdmin(player) then return end
-    replyMechanicStations(player)
+    player:emit('admin:client:interactionTypes-reply', { types = InteractionTypeService.listForAdmin() })
 end)
 
-Obelisk.onClient('admin:server:mechanic-create', function(player, data)
+Obelisk.onClient('admin:server:interactionType-list', function(player, data)
     if not isAdmin(player) then return end
-    MechanicService.createStation(data)
-    replyMechanicStations(player)
+    local descriptor = InteractionTypeService.get(data.typeKey)
+    if not descriptor then return end
+    player:emit('admin:client:interactionType-reply', { typeKey = data.typeKey, items = descriptor.list() })
 end)
 
-Obelisk.onClient('admin:server:mechanic-update', function(player, data)
+Obelisk.onClient('admin:server:interactionType-create', function(player, data)
     if not isAdmin(player) then return end
-    MechanicService.updateStation(data.stationId, data)
-    replyMechanicStations(player)
+    local descriptor = InteractionTypeService.get(data.typeKey)
+    if not descriptor then return end
+    descriptor.create(data.fields or {})
+    player:emit('admin:client:interactionType-reply', { typeKey = data.typeKey, items = descriptor.list() })
 end)
 
-Obelisk.onClient('admin:server:mechanic-delete', function(player, data)
+Obelisk.onClient('admin:server:interactionType-update', function(player, data)
     if not isAdmin(player) then return end
-    MechanicService.deleteStation(data.stationId)
-    replyMechanicStations(player)
+    local descriptor = InteractionTypeService.get(data.typeKey)
+    if not descriptor then return end
+    descriptor.update(data.id, data.fields or {})
+    player:emit('admin:client:interactionType-reply', { typeKey = data.typeKey, items = descriptor.list() })
+end)
+
+Obelisk.onClient('admin:server:interactionType-delete', function(player, data)
+    if not isAdmin(player) then return end
+    local descriptor = InteractionTypeService.get(data.typeKey)
+    if not descriptor then return end
+    descriptor.delete(data.id)
+    player:emit('admin:client:interactionType-reply', { typeKey = data.typeKey, items = descriptor.list() })
 end)
