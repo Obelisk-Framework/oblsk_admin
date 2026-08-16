@@ -1,20 +1,21 @@
 --- oblsk_admin client: owns the panel's open/closed state explicitly.
---- WebView.toggleGlobalElement was previously used here, but that combined
---- with an unconditional WebView.focus() meant closing the panel also
---- re-grabbed NUI focus with nothing to interact with. We now track
---- `panelOpen` locally and only focus when actually opening, using
---- showGlobalElement/hideGlobalElement instead of toggling blindly.
+--- The panel is a routed page ('/Admin'), not a global element, so unlike
+--- Garage/Shop (only ever opened via a world interaction, closed by their
+--- own X button/ESC) this one is also toggled by a keybind — the router
+--- alone can't tell the Vue side "you're being closed" the way
+--- hideGlobalElement used to, so a `panelOpen`/panel-open/panel-close
+--- signal pair does that explicitly in both directions.
 ---
---- Both close paths also call WebView.hide() (not just hideGlobalElement)
---- so NUI focus is actually released -- hideGlobalElement is a pure
---- SendNUIMessage with no setFocus call, so without this the player was
---- left with a cursor and no UI to click on.
+--- WebView.hide() releases NUI focus but, unlike hideGlobalElement, does
+--- NOT hide a routed page's DOM (core/web/src/App.vue's webview-hide
+--- handler only resets HUD edit mode) — so AdminPanel.vue must hide itself
+--- in response to 'admin:client:panel-close', not rely on the webview call
+--- alone.
 ---
---- ESC (core's global watcher) closes the panel with no Lua-side
---- notification, so `panelOpen` can drift to true after an ESC-close.
---- Resynced here on every keybind press via IsNuiFocused(): ESC always
---- drops focus, so if we think the panel is open but focus is gone, it was
---- closed by ESC and the next press should open it, not try to close it.
+--- ESC (core's global watcher) calls WebView.closeAll(), which only affects
+--- global elements, never routed pages — so it does nothing for this panel.
+--- AdminPanel.vue therefore listens for its own Escape keydown, same as
+--- Shop.vue/Garage.vue do for their own panels.
 local panelOpen = false
 
 Obelisk.onClient('admin:client:toggle-panel', function()
@@ -24,20 +25,20 @@ Obelisk.onClient('admin:client:toggle-panel', function()
 
     panelOpen = not panelOpen
     if panelOpen then
-        WebView.showGlobalElement('admin')
+        WebView.openPage('/Admin')
         WebView.focus()
+        WebView.emit('admin:client:panel-open', {})
     else
-        WebView.hideGlobalElement('admin')
+        WebView.emit('admin:client:panel-close', {})
         WebView.hide()
     end
 end)
 
---- Fired by the panel's own Close button (web/AdminPanel.vue), instead of
---- the generic 'core:client:close' NUI callback, so this plugin's local
---- `panelOpen` state stays in sync with what's actually hidden.
+--- Fired by the panel's own Close button / Escape handler (web/AdminPanel.vue),
+--- instead of the generic 'core:client:close' NUI callback, so this plugin's
+--- local `panelOpen` state stays in sync with what's actually hidden.
 WebView.on('admin:client:close-panel', function()
     panelOpen = false
-    WebView.hideGlobalElement('admin')
     WebView.hide()
 end)
 
@@ -74,6 +75,10 @@ local TAB_RELAYS = {
     'jobs-upsert-task', 'jobs-delete-task',
     'jobs-upsert-route', 'jobs-delete-route',
     'scheduler-list', 'scheduler-create', 'scheduler-update', 'scheduler-delete',
+    'interactions-list', 'interactions-create', 'interactions-update', 'interactions-delete', 'interactions-setEnabled',
+    'gasstation-list', 'gasstation-create', 'gasstation-update', 'gasstation-delete',
+    'gasstation-stock-add', 'gasstation-stock-update', 'gasstation-stock-remove', 'gasstation-fuelTypes-list',
+    'mechanic-list', 'mechanic-create', 'mechanic-update', 'mechanic-delete',
 }
 for _, name in ipairs(TAB_RELAYS) do
     WebView.on('admin:client:' .. name, function(data)
@@ -81,9 +86,22 @@ for _, name in ipairs(TAB_RELAYS) do
     end)
 end
 
-local TAB_REPLIES = { 'players-reply', 'moderation-reply', 'vehicles-reply', 'items-reply', 'printers-reply', 'jobs-reply', 'jobs-detail-reply', 'scheduler-reply' }
+local TAB_REPLIES = {
+    'players-reply', 'moderation-reply', 'vehicles-reply', 'items-reply', 'printers-reply', 'jobs-reply', 'jobs-detail-reply', 'scheduler-reply',
+    'interactions-reply', 'gasstation-reply', 'gasstation-fuelTypes-reply', 'mechanic-reply',
+}
 for _, name in ipairs(TAB_REPLIES) do
     Obelisk.onClient('admin:client:' .. name, function(payload)
         SendNUIMessage({ eventname = 'admin:client:' .. name, args = { payload } })
     end)
 end
+
+--- Not a plain relay: captures the admin's current position/heading and
+--- pushes it straight to the NUI, for the Interactions tab's "use my
+--- position" create/edit helpers (no create form otherwise has a way to
+--- fill in coordinates).
+WebView.on('admin:client:interactions-getMyCoords', function()
+    local coords = GetEntityCoords(PlayerPedId())
+    local heading = GetEntityHeading(PlayerPedId())
+    SendNUIMessage({ eventname = 'admin:client:interactions-myCoords', args = { { x = coords.x, y = coords.y, z = coords.z, heading = heading } } })
+end)
