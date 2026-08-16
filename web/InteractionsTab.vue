@@ -2,29 +2,55 @@
 import { ref, computed, onMounted, onBeforeUnmount, inject, watch } from 'vue'
 import Obelisk from '@/obelisk.js'
 
-// Every pill is rendered from whatever interaction types plugins have
-// registered via core's InteractionTypeService (see interactionTypes below)
-// -- oblsk_admin has no hardcoded knowledge of 'gasstation'/'mechanic'
-// anymore, and there is no "plain"/bare-interaction tab: an interaction
-// always belongs to a registered strategy, never a bare coordinate.
+// Single unified list across every interaction type a plugin has registered
+// via core's InteractionTypeService -- oblsk_admin has no hardcoded
+// knowledge of 'gasstation'/'mechanic'/etc. There is no "plain"/bare
+// interaction: every row always belongs to a registered strategy, created
+// through that strategy's own create hook, and every row is always shown
+// in the same searchable/filterable list rather than a per-type tab.
 const interactionTypes = ref([])
-const SUB_TABS = computed(() => interactionTypes.value.map(t => [t.typeKey, t.label]))
-const activeSubTab = ref(null)
-watch(interactionTypes, (types) => {
-  if (activeSubTab.value == null && types.length) activeSubTab.value = types[0].typeKey
-}, { immediate: true })
-
 const orgs = ref([])
 
-// typeKey -> items[] for whichever type tabs have been fetched so far.
+// typeKey -> items[] for every registered type, fetched up front (not
+// lazily per-tab like the old per-type-tab layout) so the unified list has
+// everything to filter/search over as soon as the panel opens.
 const typeItems = ref({})
 const fuelTypes = ref([])
 
-const selectedItemId = ref(null)
-const activeType = computed(() => interactionTypes.value.find(t => t.typeKey === activeSubTab.value) || null)
-const activeItems = computed(() => typeItems.value[activeSubTab.value] || [])
-const selectedItem = computed(() => activeItems.value.find(i => i.id === selectedItemId.value) || null)
+const searchQuery = ref('')
+const typeFilter = ref(null) // null = all types
 
+// Flattened, tagged with the type's own key/label so the list and detail
+// panel can render/route without a lookup on every row.
+const allItems = computed(() => {
+  const out = []
+  for (const type of interactionTypes.value) {
+    for (const item of typeItems.value[type.typeKey] || []) {
+      out.push({ ...item, typeKey: type.typeKey, typeLabel: type.label })
+    }
+  }
+  return out
+})
+
+const filteredItems = computed(() => {
+  const q = searchQuery.value.trim().toLowerCase()
+  return allItems.value.filter(item => {
+    if (typeFilter.value && item.typeKey !== typeFilter.value) return false
+    if (!q) return true
+    return (item.name || item.label || '').toLowerCase().includes(q)
+  })
+})
+
+// Composite key -- item ids are only unique within their own type's table,
+// not globally, so the selection/lookup key has to carry the type too.
+const keyOf = (item) => `${item.typeKey}:${item.id}`
+const selectedKey = ref(null)
+const selectedItem = computed(() => allItems.value.find(i => keyOf(i) === selectedKey.value) || null)
+const selectedType = computed(() => interactionTypes.value.find(t => t.typeKey === selectedItem.value?.typeKey) || null)
+
+// null = closed, 'pickType' = choosing which strategy to create, or a
+// typeKey once a strategy's been picked and its create form is showing.
+const createStep = ref(null)
 const typeCreateDraft = ref(null)
 const stockDraft = ref({ fuelTypeId: '', pricePerLiter: 0, currentLiters: 0, maxLiters: 0 })
 
@@ -66,6 +92,11 @@ const onTypeItemsReply = ({ typeKey, items }) => { typeItems.value = { ...typeIt
 const onFuelTypesReply = ({ fuelTypes: next }) => { fuelTypes.value = next }
 const onOrgsReply = ({ orgs: next }) => { orgs.value = next }
 
+const fetchTypeItems = (typeKey) => {
+  if (import.meta.env.DEV) return
+  Obelisk.emit('admin:client:interactionType-list', { typeKey })
+}
+
 const fetchAll = () => {
   if (import.meta.env.DEV) {
     interactionTypes.value = DEV_TYPES
@@ -79,10 +110,12 @@ const fetchAll = () => {
   Obelisk.emit('admin:client:organisations-list', {})
 }
 
-const fetchTypeItems = (typeKey) => {
-  if (import.meta.env.DEV) return
-  Obelisk.emit('admin:client:interactionType-list', { typeKey })
-}
+// As soon as the registered-type list arrives, pull every type's items up
+// front -- the unified list/search needs all of them, not just whichever
+// tab happened to be active (there are no tabs anymore).
+watch(interactionTypes, (types) => {
+  for (const type of types) fetchTypeItems(type.typeKey)
+})
 
 onMounted(() => {
   Obelisk.on('admin:client:interactionTypes-reply', onTypesReply)
@@ -103,12 +136,6 @@ if (registry) {
   watch(() => registry.get('admin')?.visible, (visible) => { if (visible) fetchAll() })
 }
 
-// Refetch a type tab's items whenever it's selected, mirroring the
-// admin-visible refetch pattern above.
-watch(activeSubTab, (key) => {
-  if (key) fetchTypeItems(key)
-})
-
 // Captures the admin's current position via client/main.lua's
 // 'admin:client:interactions-getMyCoords' handler and writes the reply
 // into whichever draft object is passed - one-shot listener per call.
@@ -125,24 +152,36 @@ function useMyPosition(target) {
   Obelisk.emit('admin:client:interactions-getMyCoords', {})
 }
 
-// --- Generic interaction types ---
-const defaultForField = (field) => (field.type === 'number' ? 0 : field.type === 'organization' || field.type === 'select' ? null : '')
-
-const openTypeCreate = () => {
-  const draft = { label: '', range: 2.0, x: 0, y: 0, z: 0 }
-  for (const field of activeType.value?.fields || []) draft[field.key] = defaultForField(field)
-  typeCreateDraft.value = draft
-}
-const submitTypeCreate = () => {
-  Obelisk.emit('admin:client:interactionType-create', { typeKey: activeSubTab.value, fields: { ...typeCreateDraft.value } })
+function selectItem(item) {
+  selectedKey.value = keyOf(item)
+  createStep.value = null
   typeCreateDraft.value = null
 }
+
+// --- Create flow: pick a strategy first, then fill its form ---
+const defaultForField = (field) => (field.type === 'number' ? 0 : field.type === 'organization' || field.type === 'select' ? null : '')
+
+const openCreate = () => { createStep.value = 'pickType'; selectedKey.value = null }
+const pickCreateType = (typeKey) => {
+  const type = interactionTypes.value.find(t => t.typeKey === typeKey)
+  const draft = { label: '', range: 2.0, x: 0, y: 0, z: 0 }
+  for (const field of type?.fields || []) draft[field.key] = defaultForField(field)
+  typeCreateDraft.value = draft
+  createStep.value = typeKey
+}
+const cancelCreate = () => { createStep.value = null; typeCreateDraft.value = null }
+const submitTypeCreate = () => {
+  Obelisk.emit('admin:client:interactionType-create', { typeKey: createStep.value, fields: { ...typeCreateDraft.value } })
+  cancelCreate()
+}
+
+// --- Generic interaction type mutations (selected item) ---
 const updateTypeField = (field, value) => {
-  Obelisk.emit('admin:client:interactionType-update', { typeKey: activeSubTab.value, id: selectedItem.value.id, fields: { [field]: value } })
+  Obelisk.emit('admin:client:interactionType-update', { typeKey: selectedItem.value.typeKey, id: selectedItem.value.id, fields: { [field]: value } })
 }
 const deleteTypeItem = () => {
-  Obelisk.emit('admin:client:interactionType-delete', { typeKey: activeSubTab.value, id: selectedItem.value.id })
-  selectedItemId.value = null
+  Obelisk.emit('admin:client:interactionType-delete', { typeKey: selectedItem.value.typeKey, id: selectedItem.value.id })
+  selectedKey.value = null
 }
 
 // --- Gas station fuel stock (special case, deliberately NOT generalized --
@@ -167,39 +206,54 @@ const removeStock = (stock) => {
 
 <template>
   <div class="min-h-0 p-5 flex flex-col gap-3">
-    <div class="flex items-center gap-1">
-      <button v-for="[key, label] in SUB_TABS" :key="key" @click="activeSubTab = key; selectedItemId = null"
-        class="px-3 py-1.5 rounded-lg text-[12px] transition"
-        :class="activeSubTab === key ? 'text-black font-medium' : 'text-white/45 hover:text-white hover:bg-white/8'"
-        :style="activeSubTab === key ? { background: 'var(--ob-accent)' } : undefined">
-        {{ label }}
-      </button>
-    </div>
-
-    <!-- Generic type-driven tab (gasstation, mechanic, anything else a plugin registers).
-         There is no "plain" interaction tab - every interaction always belongs to a
-         registered strategy, created through that strategy's own create hook. -->
-    <div v-if="activeType" class="grid gap-3 min-h-0" style="grid-template-columns: 300px 1fr">
+    <div class="grid gap-3 min-h-0" style="grid-template-columns: 340px 1fr">
       <div class="rounded-xl border border-white/10 bg-white/[0.03] overflow-hidden flex flex-col">
-        <div class="px-4 py-2.5 border-b border-white/8 flex items-center justify-between">
-          <span class="text-[12.5px] font-medium">{{ activeType.label }} · {{ activeItems.length }}</span>
-          <button @click="openTypeCreate" class="ob-mono text-[9px] px-1.5 py-0.5 rounded border border-white/12 hover:bg-white/8">+ NEW</button>
+        <div class="px-4 py-2.5 border-b border-white/8 flex items-center justify-between gap-2">
+          <span class="text-[12.5px] font-medium">Interactions · {{ filteredItems.length }}</span>
+          <button @click="openCreate" class="ob-mono text-[9px] px-1.5 py-0.5 rounded border border-white/12 hover:bg-white/8 shrink-0">+ NEW</button>
+        </div>
+        <div class="px-3 py-2 border-b border-white/8 flex gap-1.5">
+          <input v-model="searchQuery" placeholder="Search…" class="flex-1 h-8 px-2.5 rounded-lg bg-black/40 border border-white/12 text-[11px] outline-none" />
+          <select v-model="typeFilter" class="h-8 px-2 rounded-lg bg-black/40 border border-white/12 text-[10.5px] outline-none">
+            <option :value="null">All types</option>
+            <option v-for="t in interactionTypes" :key="t.typeKey" :value="t.typeKey">{{ t.label }}</option>
+          </select>
         </div>
         <div class="overflow-y-auto" style="max-height: 520px">
-          <button v-for="item in activeItems" :key="item.id" @click="selectedItemId = item.id; typeCreateDraft = null"
+          <button v-for="item in filteredItems" :key="keyOf(item)" @click="selectItem(item)"
             class="w-full px-3.5 py-2.5 text-left border-b border-white/6 transition"
-            :class="selectedItemId === item.id ? 'bg-white/[0.07]' : 'hover:bg-white/4'">
-            <span class="block text-[12px] truncate">{{ item.name }}</span>
-            <span class="block ob-mono text-[9px] text-white/35 truncate">{{ item.organizationName || 'Unowned' }} · {{ round(item.x) }}, {{ round(item.y) }}, {{ round(item.z) }}</span>
+            :class="selectedKey === keyOf(item) ? 'bg-white/[0.07]' : 'hover:bg-white/4'">
+            <div class="flex items-center gap-1.5">
+              <span class="ob-mono text-[8px] px-1.5 py-0.5 rounded border border-white/12 text-white/45 shrink-0">{{ item.typeLabel }}</span>
+              <span class="text-[12px] truncate">{{ item.name || item.label }}</span>
+            </div>
+            <span class="block ob-mono text-[9px] text-white/35 truncate mt-0.5">{{ item.organizationName || 'Unowned' }} · {{ round(item.x) }}, {{ round(item.y) }}, {{ round(item.z) }}</span>
           </button>
-          <div v-if="!activeItems.length" class="py-6 text-center text-[11.5px] text-white/30">Nothing yet.</div>
+          <div v-if="!filteredItems.length" class="py-6 text-center text-[11.5px] text-white/30">
+            {{ allItems.length ? 'No matches.' : 'Nothing yet.' }}
+          </div>
         </div>
       </div>
 
-      <div v-if="typeCreateDraft" class="rounded-xl border border-white/10 bg-white/[0.03] p-4 space-y-3 overflow-y-auto" style="max-height: 560px">
-        <div class="text-[13px] font-medium">New {{ activeType.label.toLowerCase() }}</div>
+      <!-- Step 1 of create: pick which registered strategy this interaction belongs to. -->
+      <div v-if="createStep === 'pickType'" class="rounded-xl border border-white/10 bg-white/[0.03] p-4 space-y-3 self-start">
+        <div class="text-[13px] font-medium">New interaction — pick a type</div>
+        <div v-if="!interactionTypes.length" class="text-[11.5px] text-white/40">No interaction types registered yet.</div>
+        <div class="grid grid-cols-2 gap-2">
+          <button v-for="t in interactionTypes" :key="t.typeKey" @click="pickCreateType(t.typeKey)"
+            class="rounded-lg border border-white/12 p-3 text-left hover:bg-white/8 transition">
+            <div class="text-[12.5px] font-medium">{{ t.label }}</div>
+            <div class="ob-mono text-[8.5px] text-white/35 mt-1">Blip: {{ t.blipRequirement }} · Ped: {{ t.pedRequirement }} · Marker: {{ t.markerRequirement }}</div>
+          </button>
+        </div>
+        <button @click="cancelCreate" class="h-9 px-3.5 rounded-lg border border-white/12 text-[12px]">Cancel</button>
+      </div>
 
-        <div v-for="field in activeType.fields" :key="field.key">
+      <!-- Step 2 of create: the picked strategy's own field schema. -->
+      <div v-else-if="typeCreateDraft" class="rounded-xl border border-white/10 bg-white/[0.03] p-4 space-y-3 overflow-y-auto" style="max-height: 560px">
+        <div class="text-[13px] font-medium">New {{ interactionTypes.find(t => t.typeKey === createStep)?.label.toLowerCase() }}</div>
+
+        <div v-for="field in interactionTypes.find(t => t.typeKey === createStep)?.fields || []" :key="field.key">
           <div class="ob-mono text-[9px] tracking-[0.2em] text-white/30 uppercase mb-1.5">{{ field.label }}</div>
           <select v-if="field.type === 'organization'" v-model="typeCreateDraft[field.key]" class="w-full h-9 px-3 rounded-lg bg-black/40 border border-white/12 text-[11.5px] outline-none">
             <option :value="null">None (unowned)</option>
@@ -226,19 +280,20 @@ const removeStock = (stock) => {
         </div>
         <button @click="useMyPosition(typeCreateDraft)" class="w-full h-8 rounded-lg border border-white/12 text-[11px] hover:bg-white/8">Use my position</button>
         <div class="flex gap-2">
-          <button @click="typeCreateDraft = null" class="h-9 px-3.5 rounded-lg border border-white/12 text-[12px]">Cancel</button>
+          <button @click="cancelCreate" class="h-9 px-3.5 rounded-lg border border-white/12 text-[12px]">Cancel</button>
           <button @click="submitTypeCreate" class="h-9 px-4 rounded-lg text-black text-[12px] font-medium" style="background: var(--ob-accent)">Create</button>
         </div>
       </div>
 
       <div v-else-if="selectedItem" class="rounded-xl border border-white/10 bg-white/[0.03] p-4 space-y-3 overflow-y-auto" style="max-height: 560px">
         <div class="flex items-center gap-1.5 flex-wrap">
-          <span class="ob-mono text-[9px] px-1.5 py-0.5 rounded border border-white/12 text-white/50">Blip: {{ activeType.blipRequirement }}</span>
-          <span class="ob-mono text-[9px] px-1.5 py-0.5 rounded border border-white/12 text-white/50">Ped: {{ activeType.pedRequirement }}</span>
-          <span class="ob-mono text-[9px] px-1.5 py-0.5 rounded border border-white/12 text-white/50">Marker: {{ activeType.markerRequirement }}</span>
+          <span class="ob-mono text-[9px] px-1.5 py-0.5 rounded border border-white/12 text-white/60">{{ selectedType?.label }}</span>
+          <span class="ob-mono text-[9px] px-1.5 py-0.5 rounded border border-white/12 text-white/50">Blip: {{ selectedType?.blipRequirement }}</span>
+          <span class="ob-mono text-[9px] px-1.5 py-0.5 rounded border border-white/12 text-white/50">Ped: {{ selectedType?.pedRequirement }}</span>
+          <span class="ob-mono text-[9px] px-1.5 py-0.5 rounded border border-white/12 text-white/50">Marker: {{ selectedType?.markerRequirement }}</span>
         </div>
 
-        <div v-for="field in activeType.fields" :key="field.key">
+        <div v-for="field in selectedType?.fields || []" :key="field.key">
           <div class="ob-mono text-[9px] tracking-[0.2em] text-white/30 uppercase mb-1.5">{{ field.label }}</div>
           <select v-if="field.type === 'organization'" :value="selectedItem[field.key]" @change="updateTypeField(field.key, $event.target.value ? Number($event.target.value) : null)"
             class="w-full h-9 px-3 rounded-lg bg-black/40 border border-white/12 text-[11.5px] outline-none">
@@ -272,9 +327,8 @@ const removeStock = (stock) => {
              fields schema above. A future "plugin-contributed rich sub-editor"
              system would be the right generalization, but with exactly one
              consumer today it isn't worth building yet - this is a scope trim,
-             not an oversight. Wired to `selectedItem` (the generic list entry)
-             instead of a bespoke gasstation-only list. -->
-        <div v-if="activeSubTab === 'gasstation'" class="pt-2 border-t border-white/8">
+             not an oversight. -->
+        <div v-if="selectedItem.typeKey === 'gasstation'" class="pt-2 border-t border-white/8">
           <div class="ob-mono text-[9px] tracking-[0.2em] text-white/30 uppercase mb-1.5">Fuel stock</div>
           <div class="flex items-center gap-1.5 mb-1 ob-mono text-[8.5px] text-white/35">
             <span class="w-16 shrink-0"></span>
@@ -305,8 +359,7 @@ const removeStock = (stock) => {
           <button @click="deleteTypeItem" class="ob-mono text-[9px] px-1.5 py-1 rounded border border-white/12 text-red-300 hover:bg-red-500/10">DELETE</button>
         </div>
       </div>
-      <div v-else class="grid place-items-center text-white/30 text-[12px]">Nothing selected.</div>
+      <div v-else class="grid place-items-center text-white/30 text-[12px]">Select an interaction, or "+ NEW" to add one.</div>
     </div>
-    <div v-else class="grid place-items-center text-white/30 text-[12px] flex-1">No interaction types registered yet.</div>
   </div>
 </template>
