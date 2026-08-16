@@ -22,6 +22,41 @@ local function replyWithList(player)
     })
 end
 
+--- @param scheduleType string 'interval' | 'cron'
+--- @param intervalSeconds number|nil
+--- @param cronExpression string|nil
+--- @return boolean ok
+--- @return string|nil reason
+local function validateSchedule(scheduleType, intervalSeconds, cronExpression)
+    if scheduleType == 'interval' then
+        if type(intervalSeconds) ~= 'number' or intervalSeconds <= 0 then
+            return false, 'Interval must be a positive number of seconds'
+        end
+        return true
+    elseif scheduleType == 'cron' then
+        local ok = pcall(CronExpression.matches, cronExpression, os.time())
+        if not ok then
+            return false, 'Invalid cron expression'
+        end
+        return true
+    end
+    return false, 'Unknown schedule type'
+end
+
+local UPDATABLE_FIELDS = { 'action_id', 'schedule_type', 'interval_seconds', 'cron_expression', 'enabled' }
+
+--- @param attrs table raw attributes from the client
+--- @return table filtered to only known, updatable columns
+local function filterUpdatableAttrs(attrs)
+    local filtered = {}
+    for _, field in ipairs(UPDATABLE_FIELDS) do
+        if attrs[field] ~= nil then
+            filtered[field] = attrs[field]
+        end
+    end
+    return filtered
+end
+
 Obelisk.onClient('admin:server:scheduler-list', function(player)
     if not isAdmin(player) then return end
     replyWithList(player)
@@ -29,6 +64,11 @@ end)
 
 Obelisk.onClient('admin:server:scheduler-create', function(player, data)
     if not isAdmin(player) then return end
+    local ok, reason = validateSchedule(data.scheduleType, data.intervalSeconds, data.cronExpression)
+    if not ok then
+        NotificationService.error(player, 'Scheduler', reason)
+        return
+    end
     SchedulerService.create(data.actionId, data.scheduleType, {
         intervalSeconds = data.intervalSeconds,
         cronExpression = data.cronExpression,
@@ -38,7 +78,19 @@ end)
 
 Obelisk.onClient('admin:server:scheduler-update', function(player, data)
     if not isAdmin(player) then return end
-    SchedulerService.update(data.id, data.attributes or {})
+    local attrs = filterUpdatableAttrs(data.attributes or {})
+    if attrs.schedule_type or attrs.interval_seconds ~= nil or attrs.cron_expression ~= nil then
+        local ok, reason = validateSchedule(
+            attrs.schedule_type or data.currentScheduleType,
+            attrs.interval_seconds,
+            attrs.cron_expression
+        )
+        if not ok then
+            NotificationService.error(player, 'Scheduler', reason)
+            return
+        end
+    end
+    SchedulerService.update(data.id, attrs)
     replyWithList(player)
 end)
 
