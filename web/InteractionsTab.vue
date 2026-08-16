@@ -470,7 +470,7 @@ const unlinkOwner = (owner) => {
                 <span class="uppercase" :style="{ color: tx.type === 'crack' ? '#f87171' : tx.type === 'withdrawal' ? 'var(--ob-accent)' : 'rgba(255,255,255,.35)' }">{{ tx.type }}</span>
                 {{ tx.type === 'withdrawal' ? '· ' + (tx.characterName || 'unknown member') : tx.type === 'crack' ? '· unknown (stolen)' : '' }}
               </span>
-              <span>{{ tx.amount }}</span>
+              <span>${{ Number(tx.amount).toFixed(2) }}</span>
             </div>
           </div>
         </div>
