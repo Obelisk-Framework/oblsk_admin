@@ -70,6 +70,9 @@ local TAB_RELAYS = {
     'vehicles-list', 'vehicles-delete', 'vehicles-teleport-to-admin',
     'baseVehicles-list', 'baseVehicles-create', 'baseVehicles-update', 'baseVehicles-delete', 'baseVehicles-fuelTypes-list',
     'items-list', 'items-update', 'items-create', 'items-give',
+    'items-icon-upload-mint',
+    'items-bindings-list', 'items-bindings-set', 'items-bindings-clear',
+    'items-actions-list', 'items-update-actions',
     'printers-list', 'printers-create', 'printers-update', 'printers-delete', 'printers-refill',
     'jobs-list', 'jobs-detail', 'jobs-create', 'jobs-update', 'jobs-delete',
     'jobs-upsert-level', 'jobs-delete-level',
@@ -90,6 +93,7 @@ local TAB_REPLIES = {
     'gasstation-fuelTypes-reply',
     'baseVehicles-reply', 'baseVehicles-fuelTypes-reply',
     'interactionTypes-reply', 'interactionType-reply',
+    'items-icon-upload-token-reply', 'items-bindings-reply', 'items-actions-reply',
 }
 for _, name in ipairs(TAB_REPLIES) do
     Obelisk.onClient('admin:client:' .. name, function(payload)
@@ -105,4 +109,15 @@ WebView.on('admin:client:interactions-getMyCoords', function()
     local coords = GetEntityCoords(PlayerPedId())
     local heading = GetEntityHeading(PlayerPedId())
     SendNUIMessage({ eventname = 'admin:client:interactions-myCoords', args = { { x = coords.x, y = coords.y, z = coords.z, heading = heading } } })
+end)
+
+--- Not a plain relay: the NUI (CEF, a different origin) can't discover the
+--- connected FiveM server's own ip:port itself, but needs an absolute URL to
+--- POST an icon upload straight to this server's /storage/upload endpoint
+--- (that endpoint lives on the game-server TCP port, not the nui:// resource
+--- -file origin SendNUIMessage/WebView otherwise operate on). Mirrors the
+--- interactions-getMyCoords pattern above: a client-Lua-computed value the
+--- NUI has no other way to obtain.
+WebView.on('admin:client:items-get-upload-endpoint', function()
+    SendNUIMessage({ eventname = 'admin:client:items-upload-endpoint', args = { { endpoint = GetCurrentServerEndpoint() } } })
 end)
