@@ -43,3 +43,45 @@ Obelisk.onClient('admin:server:items-give', function(player, data)
     end
     replyWithList(player)
 end)
+
+local function replyWithCategories(player)
+    player:emit('admin:client:categories-reply', { categories = ItemService.listCategories() })
+end
+
+Obelisk.onClient('admin:server:categories-list', function(player)
+    if not isAdmin(player) then return end
+    replyWithCategories(player)
+end)
+
+Obelisk.onClient('admin:server:categories-create', function(player, data)
+    if not isAdmin(player) then return end
+    local id, reason = ItemService.createCategory(data.attributes or {})
+    if not id then
+        NotificationService.error(player, 'Items', reason)
+    end
+    replyWithCategories(player)
+end)
+
+Obelisk.onClient('admin:server:categories-update', function(player, data)
+    if not isAdmin(player) then return end
+    ItemService.updateCategory(data.categoryId, data.attributes or {})
+    replyWithCategories(player)
+end)
+
+Obelisk.onClient('admin:server:categories-delete', function(player, data)
+    if not isAdmin(player) then return end
+    local ok, reason = ItemService.deleteCategory(data.categoryId)
+    if not ok then
+        NotificationService.error(player, 'Items', reason)
+    end
+    replyWithCategories(player)
+end)
+
+Obelisk.onClient('admin:server:items-update-category-data', function(player, data)
+    if not isAdmin(player) then return end
+    local ok, errors = ItemService.updateBaseItemCategoryData(data.baseItemId, data.values or {})
+    if not ok then
+        NotificationService.error(player, 'Items', table.concat(errors, ', '))
+    end
+    replyWithList(player)
+end)

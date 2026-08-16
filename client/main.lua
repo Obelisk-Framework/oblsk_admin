@@ -68,6 +68,8 @@ local TAB_RELAYS = {
     'moderation-list', 'moderation-ban', 'moderation-unban', 'moderation-warn', 'moderation-kick',
     'vehicles-list', 'vehicles-delete', 'vehicles-teleport-to-admin',
     'items-list', 'items-update', 'items-create', 'items-give',
+    'categories-list', 'categories-create', 'categories-update', 'categories-delete',
+    'items-update-category-data',
     'printers-list', 'printers-create', 'printers-update', 'printers-delete', 'printers-refill',
     'jobs-list', 'jobs-detail', 'jobs-create', 'jobs-update', 'jobs-delete',
     'jobs-upsert-level', 'jobs-delete-level',
@@ -81,7 +83,7 @@ for _, name in ipairs(TAB_RELAYS) do
     end)
 end
 
-local TAB_REPLIES = { 'players-reply', 'moderation-reply', 'vehicles-reply', 'items-reply', 'printers-reply', 'jobs-reply', 'jobs-detail-reply', 'scheduler-reply' }
+local TAB_REPLIES = { 'players-reply', 'moderation-reply', 'vehicles-reply', 'items-reply', 'categories-reply', 'printers-reply', 'jobs-reply', 'jobs-detail-reply', 'scheduler-reply' }
 for _, name in ipairs(TAB_REPLIES) do
     Obelisk.onClient('admin:client:' .. name, function(payload)
         SendNUIMessage({ eventname = 'admin:client:' .. name, args = { payload } })
