@@ -8,6 +8,7 @@ import ModerationTab from './ModerationTab.vue'
 import VehiclesTab from './VehiclesTab.vue'
 import ItemsTab from './ItemsTab.vue'
 import JobsTab from './JobsTab.vue'
+import SchedulerTab from './SchedulerTab.vue'
 import FishingTab from '../../oblsk_fishing/web/FishingTab.vue'
 import HuntingTab from '../../oblsk_hunting/web/HuntingTab.vue'
 import PrintersTab from './PrintersTab.vue'
@@ -15,7 +16,7 @@ import PrintersTab from './PrintersTab.vue'
 const TABS = [
   ['players', 'Players'], ['moderation', 'Moderation'], ['organisations', 'Organisations'],
   ['vehicles', 'Vehicles'], ['interactions', 'Interactions'], ['blips', 'Blips'],
-  ['locations', 'Locations'], ['items', 'Items'], ['jobs', 'Jobs'], ['fishing', 'Fishing'], ['hunting', 'Hunting'], ['printers', 'Printers'], ['economy', 'Economy'],
+  ['locations', 'Locations'], ['items', 'Items'], ['jobs', 'Jobs'], ['scheduler', 'Scheduler'], ['fishing', 'Fishing'], ['hunting', 'Hunting'], ['printers', 'Printers'], ['economy', 'Economy'],
   ['server', 'Server'], ['audit', 'Audit log'],
 ]
 
@@ -52,6 +53,7 @@ const close = () => Obelisk.emit('admin:client:close-panel', {})
       <VehiclesTab v-else-if="activeTab === 'vehicles'" />
       <ItemsTab v-else-if="activeTab === 'items'" />
       <JobsTab v-else-if="activeTab === 'jobs'" />
+      <SchedulerTab v-else-if="activeTab === 'scheduler'" />
       <FishingTab v-else-if="activeTab === 'fishing'" />
       <HuntingTab v-else-if="activeTab === 'hunting'" />
       <PrintersTab v-else-if="activeTab === 'printers'" />
