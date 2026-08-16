@@ -81,6 +81,7 @@ local TAB_RELAYS = {
     'scheduler-list', 'scheduler-create', 'scheduler-update', 'scheduler-delete',
     'gasstation-stock-add', 'gasstation-stock-update', 'gasstation-stock-remove', 'gasstation-fuelTypes-list',
     'interactionTypes-list', 'interactionType-list', 'interactionType-create', 'interactionType-update', 'interactionType-delete',
+    'safe-owners-link', 'safe-owners-unlink', 'safe-ownerCandidates-list',
 }
 for _, name in ipairs(TAB_RELAYS) do
     WebView.on('admin:client:' .. name, function(data)
@@ -94,6 +95,7 @@ local TAB_REPLIES = {
     'baseVehicles-reply', 'baseVehicles-fuelTypes-reply',
     'interactionTypes-reply', 'interactionType-reply',
     'items-icon-upload-token-reply', 'items-bindings-reply', 'items-actions-reply',
+    'safe-ownerCandidates-reply',
 }
 for _, name in ipairs(TAB_REPLIES) do
     Obelisk.onClient('admin:client:' .. name, function(payload)

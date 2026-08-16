@@ -52,6 +52,43 @@ Obelisk.onClient('admin:server:gasstation-fuelTypes-list', function(player)
 end)
 
 --------------------------------------------------------------------------------
+-- Safes - only the "linked stations" sub-editor stays bespoke, same posture
+-- as the gas station stock block above. Safe list/create/update/delete go
+-- through the generic interactionType-* handlers below (typeKey='safe');
+-- owner-link mutations reply through the same generic 'interactionType-reply'
+-- event so the already-generic selected-item panel picks up the refreshed
+-- owners list.
+--------------------------------------------------------------------------------
+
+local function replySafesGeneric(player)
+    player:emit('admin:client:interactionType-reply', { typeKey = 'safe', items = SafeService.listStationsForAdmin() })
+end
+
+Obelisk.onClient('admin:server:safe-owners-link', function(player, data)
+    if not isAdmin(player) then return end
+    SafeService.linkOwner(data.safeId, data.ownerType, data.ownerId)
+    replySafesGeneric(player)
+end)
+
+Obelisk.onClient('admin:server:safe-owners-unlink', function(player, data)
+    if not isAdmin(player) then return end
+    SafeService.unlinkOwner(data.safeId, data.ownerType, data.ownerId)
+    replySafesGeneric(player)
+end)
+
+--- Lets the Vue picker show "which shop/gasstation/etc rows exist to link" -
+--- dispatches through whatever type ownerType resolves to via
+--- InteractionTypeService.get(ownerType).list() generically. No new
+--- per-type code needed here: every station type already has its own
+--- admin `list` hook registered.
+Obelisk.onClient('admin:server:safe-ownerCandidates-list', function(player, data)
+    if not isAdmin(player) then return end
+    local descriptor = InteractionTypeService.get(data.ownerType)
+    if not descriptor then return end
+    player:emit('admin:client:safe-ownerCandidates-reply', { ownerType = data.ownerType, items = descriptor.list() })
+end)
+
+--------------------------------------------------------------------------------
 -- Generic interaction types - dynamic replacement for the old bespoke
 -- gasstation-*/mechanic-* CRUD handlers above. Any plugin that has called
 -- InteractionTypeService.register(...) (oblsk_gasstation, oblsk_mechanic,

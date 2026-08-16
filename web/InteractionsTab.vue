@@ -54,6 +54,12 @@ const createStep = ref(null)
 const typeCreateDraft = ref(null)
 const stockDraft = ref({ fuelTypeId: '', pricePerLiter: 0, currentLiters: 0, maxLiters: 0 })
 
+// --- Safe "linked stations" sub-editor state (bespoke, see the template
+// block below) ---
+const linkOwnerType = ref('')
+const linkOwnerCandidates = ref([]) // items[] for whatever ownerType is currently picked
+const linkOwnerId = ref('')
+
 const round = (n) => (typeof n === 'number' ? Math.round(n * 10) / 10 : n)
 
 const DEV_TYPES = [
@@ -73,6 +79,15 @@ const DEV_TYPES = [
     ],
     blipRequirement: 'optional', pedRequirement: 'optional', markerRequirement: 'none',
   },
+  {
+    typeKey: 'safe', label: 'Safe',
+    fields: [
+      { key: 'name', label: 'Name', type: 'text', required: true },
+      { key: 'maxCash', label: 'Max cash', type: 'number' },
+      { key: 'decayAmount', label: 'Decay/tick', type: 'number' },
+    ],
+    blipRequirement: 'none', pedRequirement: 'none', markerRequirement: 'optional',
+  },
 ]
 const DEV_TYPE_ITEMS = {
   gasstation: [
@@ -83,6 +98,11 @@ const DEV_TYPE_ITEMS = {
   mechanic: [
     { id: 1, name: 'Legion Bay', organizationId: null, organizationName: null, interactionId: 3, x: 40, y: 50, z: 60, range: 2.0, label: 'Drain tank' },
   ],
+  safe: [
+    { id: 1, name: "Rob's Liquor — Back Safe", interactionId: 4, x: 12, y: 22, z: 30, range: 2.0, label: 'Open safe', maxCash: 15000, decayAmount: 50, owners: [
+      { id: 1, ownerType: 'shop', ownerId: 1, ownerLabel: "Rob's Liquor" },
+    ] },
+  ],
 }
 const DEV_FUEL_TYPES = [{ id: 1, name: 'Regular' }, { id: 2, name: 'Diesel' }]
 const DEV_ORGS = [{ id: 1, name: 'City Works' }]
@@ -91,6 +111,10 @@ const onTypesReply = ({ types: next }) => { interactionTypes.value = next }
 const onTypeItemsReply = ({ typeKey, items }) => { typeItems.value = { ...typeItems.value, [typeKey]: items } }
 const onFuelTypesReply = ({ fuelTypes: next }) => { fuelTypes.value = next }
 const onOrgsReply = ({ orgs: next }) => { orgs.value = next }
+const onSafeOwnerCandidatesReply = ({ ownerType, items }) => {
+  if (ownerType !== linkOwnerType.value) return // stale reply for a since-changed picker
+  linkOwnerCandidates.value = items
+}
 
 const fetchTypeItems = (typeKey) => {
   if (import.meta.env.DEV) return
@@ -122,6 +146,7 @@ onMounted(() => {
   Obelisk.on('admin:client:interactionType-reply', onTypeItemsReply)
   Obelisk.on('admin:client:gasstation-fuelTypes-reply', onFuelTypesReply)
   Obelisk.on('admin:client:organisations-reply', onOrgsReply)
+  Obelisk.on('admin:client:safe-ownerCandidates-reply', onSafeOwnerCandidatesReply)
   fetchAll()
 })
 onBeforeUnmount(() => {
@@ -129,6 +154,7 @@ onBeforeUnmount(() => {
   Obelisk.off('admin:client:interactionType-reply', onTypeItemsReply)
   Obelisk.off('admin:client:gasstation-fuelTypes-reply', onFuelTypesReply)
   Obelisk.off('admin:client:organisations-reply', onOrgsReply)
+  Obelisk.off('admin:client:safe-ownerCandidates-reply', onSafeOwnerCandidatesReply)
 })
 
 const registry = inject('obelisk:globalElementsRegistry', null)
@@ -201,6 +227,40 @@ const updateStockField = (stock, field, value) => {
 }
 const removeStock = (stock) => {
   Obelisk.emit('admin:client:gasstation-stock-remove', { stockId: stock.id })
+}
+
+// --- Safe "linked stations" sub-editor (special case, deliberately NOT
+// generalized -- same posture as the gas station stock block above). Every
+// OTHER registered interaction type is a valid owner type to link, `safe`
+// itself excluded. ---
+const linkableOwnerTypes = computed(() => interactionTypes.value.filter(t => t.typeKey !== 'safe'))
+const onLinkOwnerTypeChange = () => {
+  linkOwnerId.value = ''
+  linkOwnerCandidates.value = []
+  if (!linkOwnerType.value) return
+  if (import.meta.env.DEV) {
+    linkOwnerCandidates.value = DEV_TYPE_ITEMS[linkOwnerType.value] || []
+    return
+  }
+  Obelisk.emit('admin:client:safe-ownerCandidates-list', { ownerType: linkOwnerType.value })
+}
+const linkOwner = () => {
+  if (!linkOwnerType.value || !linkOwnerId.value) return
+  Obelisk.emit('admin:client:safe-owners-link', {
+    safeId: selectedItem.value.id,
+    ownerType: linkOwnerType.value,
+    ownerId: Number(linkOwnerId.value),
+  })
+  linkOwnerType.value = ''
+  linkOwnerId.value = ''
+  linkOwnerCandidates.value = []
+}
+const unlinkOwner = (owner) => {
+  Obelisk.emit('admin:client:safe-owners-unlink', {
+    safeId: selectedItem.value.id,
+    ownerType: owner.ownerType,
+    ownerId: owner.ownerId,
+  })
 }
 </script>
 
@@ -352,6 +412,31 @@ const removeStock = (stock) => {
             <input v-model.number="stockDraft.currentLiters" type="number" step="1" placeholder="Cur L" title="Current liters in stock" class="h-8 w-16 px-2 rounded-lg bg-black/40 border border-white/12 ob-mono text-[10px] outline-none" />
             <input v-model.number="stockDraft.maxLiters" type="number" step="1" placeholder="Max L" title="Max tank capacity in liters" class="h-8 w-16 px-2 rounded-lg bg-black/40 border border-white/12 ob-mono text-[10px] outline-none" />
             <button @click="addStock" title="Add this fuel type to the station" class="ob-mono text-[9px] px-1.5 py-1 rounded border border-white/12 hover:bg-white/8">ADD</button>
+          </div>
+        </div>
+
+        <!-- Safe linked-stations sub-editor - deliberately kept as a bespoke,
+             typeKey==='safe'-only block, same posture as the gas station
+             fuel stock block above. Any linked owner can deposit its own
+             point-of-sale revenue into this safe (see oblsk_safe). -->
+        <div v-if="selectedItem.typeKey === 'safe'" class="pt-2 border-t border-white/8">
+          <div class="ob-mono text-[9px] tracking-[0.2em] text-white/30 uppercase mb-1.5">Linked stations</div>
+          <div v-if="!selectedItem.owners?.length" class="text-[11px] text-white/35 mb-2">No linked stations yet.</div>
+          <div v-for="owner in selectedItem.owners" :key="owner.id" class="flex items-center gap-1.5 mb-1.5">
+            <span class="ob-mono text-[8px] px-1.5 py-0.5 rounded border border-white/12 text-white/45 shrink-0">{{ owner.ownerType }}</span>
+            <span class="text-[11px] flex-1 truncate">{{ owner.ownerLabel }}</span>
+            <button @click="unlinkOwner(owner)" title="Unlink this station" class="ob-mono text-[9px] px-1.5 py-1 rounded border border-white/12 text-red-300 hover:bg-red-500/10">X</button>
+          </div>
+          <div class="flex items-center gap-1.5 mt-2">
+            <select v-model="linkOwnerType" @change="onLinkOwnerTypeChange" title="Owner type" class="h-8 px-2 rounded-lg bg-black/40 border border-white/12 text-[10px] outline-none flex-1">
+              <option value="">Type…</option>
+              <option v-for="t in linkableOwnerTypes" :key="t.typeKey" :value="t.typeKey">{{ t.label }}</option>
+            </select>
+            <select v-model="linkOwnerId" title="Station" class="h-8 px-2 rounded-lg bg-black/40 border border-white/12 text-[10px] outline-none flex-1">
+              <option value="">Station…</option>
+              <option v-for="c in linkOwnerCandidates" :key="c.id" :value="c.id">{{ c.name || c.label }}</option>
+            </select>
+            <button @click="linkOwner" title="Link this station to the safe" class="ob-mono text-[9px] px-1.5 py-1 rounded border border-white/12 hover:bg-white/8">LINK</button>
           </div>
         </div>
 
