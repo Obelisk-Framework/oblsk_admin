@@ -68,6 +68,7 @@ local TAB_RELAYS = {
     'players-list', 'players-teleport-to-player', 'players-bring-player', 'players-kick', 'players-spectate',
     'moderation-list', 'moderation-ban', 'moderation-unban', 'moderation-warn', 'moderation-kick',
     'vehicles-list', 'vehicles-delete', 'vehicles-teleport-to-admin',
+    'baseVehicles-list', 'baseVehicles-create', 'baseVehicles-update', 'baseVehicles-delete', 'baseVehicles-fuelTypes-list',
     'items-list', 'items-update', 'items-create', 'items-give',
     'printers-list', 'printers-create', 'printers-update', 'printers-delete', 'printers-refill',
     'jobs-list', 'jobs-detail', 'jobs-create', 'jobs-update', 'jobs-delete',
@@ -87,6 +88,7 @@ end
 local TAB_REPLIES = {
     'players-reply', 'moderation-reply', 'vehicles-reply', 'items-reply', 'printers-reply', 'jobs-reply', 'jobs-detail-reply', 'scheduler-reply',
     'gasstation-fuelTypes-reply',
+    'baseVehicles-reply', 'baseVehicles-fuelTypes-reply',
     'interactionTypes-reply', 'interactionType-reply',
 }
 for _, name in ipairs(TAB_REPLIES) do
