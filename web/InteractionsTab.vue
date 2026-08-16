@@ -317,10 +317,13 @@ const removeStock = (stock) => {
 
         <div>
           <div class="ob-mono text-[9px] tracking-[0.2em] text-white/30 uppercase mb-1.5">Coordinates</div>
+          <div class="grid grid-cols-3 gap-1.5 mb-1 ob-mono text-[9px] text-white/35 text-center">
+            <span>X</span><span>Y</span><span>Z</span>
+          </div>
           <div class="grid grid-cols-3 gap-1.5 mb-1.5">
-            <input :value="selectedItem.x" @change="updateTypeField('x', Number($event.target.value))" type="number" step="0.1" class="h-9 px-2 rounded-lg bg-black/40 border border-white/12 ob-mono text-[11px] outline-none" />
-            <input :value="selectedItem.y" @change="updateTypeField('y', Number($event.target.value))" type="number" step="0.1" class="h-9 px-2 rounded-lg bg-black/40 border border-white/12 ob-mono text-[11px] outline-none" />
-            <input :value="selectedItem.z" @change="updateTypeField('z', Number($event.target.value))" type="number" step="0.1" class="h-9 px-2 rounded-lg bg-black/40 border border-white/12 ob-mono text-[11px] outline-none" />
+            <input :value="selectedItem.x" @change="updateTypeField('x', Number($event.target.value))" type="number" step="0.1" title="X" class="h-9 px-2 rounded-lg bg-black/40 border border-white/12 ob-mono text-[11px] outline-none" />
+            <input :value="selectedItem.y" @change="updateTypeField('y', Number($event.target.value))" type="number" step="0.1" title="Y" class="h-9 px-2 rounded-lg bg-black/40 border border-white/12 ob-mono text-[11px] outline-none" />
+            <input :value="selectedItem.z" @change="updateTypeField('z', Number($event.target.value))" type="number" step="0.1" title="Z" class="h-9 px-2 rounded-lg bg-black/40 border border-white/12 ob-mono text-[11px] outline-none" />
           </div>
           <button @click="useMyPosition(selectedItem); updateTypeField('x', selectedItem.x); updateTypeField('y', selectedItem.y); updateTypeField('z', selectedItem.z)"
             class="w-full h-8 rounded-lg border border-white/12 text-[11px] hover:bg-white/8">Use my position</button>
@@ -335,22 +338,28 @@ const removeStock = (stock) => {
              instead of a bespoke gasstation-only list. -->
         <div v-if="activeSubTab === 'gasstation'" class="pt-2 border-t border-white/8">
           <div class="ob-mono text-[9px] tracking-[0.2em] text-white/30 uppercase mb-1.5">Fuel stock</div>
+          <div class="flex items-center gap-1.5 mb-1 ob-mono text-[8.5px] text-white/35">
+            <span class="w-16 shrink-0"></span>
+            <span class="w-16 text-center">$/L</span>
+            <span class="w-16 text-center">CURRENT L</span>
+            <span class="w-16 text-center">MAX L</span>
+          </div>
           <div v-for="stock in selectedItem.stock" :key="stock.id" class="flex items-center gap-1.5 mb-1.5">
             <span class="text-[11px] w-16 truncate">{{ stock.fuelTypeName }}</span>
-            <input :value="stock.pricePerLiter" @change="updateStockField(stock, 'pricePerLiter', $event.target.value)" type="number" step="0.01" title="Price/L" class="h-8 w-16 px-2 rounded-lg bg-black/40 border border-white/12 ob-mono text-[10px] outline-none" />
-            <input :value="stock.currentLiters" @change="updateStockField(stock, 'currentLiters', $event.target.value)" type="number" step="1" title="Current L" class="h-8 w-16 px-2 rounded-lg bg-black/40 border border-white/12 ob-mono text-[10px] outline-none" />
-            <input :value="stock.maxLiters" @change="updateStockField(stock, 'maxLiters', $event.target.value)" type="number" step="1" title="Max L" class="h-8 w-16 px-2 rounded-lg bg-black/40 border border-white/12 ob-mono text-[10px] outline-none" />
-            <button @click="removeStock(stock)" class="ob-mono text-[9px] px-1.5 py-1 rounded border border-white/12 text-red-300 hover:bg-red-500/10">X</button>
+            <input :value="stock.pricePerLiter" @change="updateStockField(stock, 'pricePerLiter', $event.target.value)" type="number" step="0.01" title="Price per liter" class="h-8 w-16 px-2 rounded-lg bg-black/40 border border-white/12 ob-mono text-[10px] outline-none" />
+            <input :value="stock.currentLiters" @change="updateStockField(stock, 'currentLiters', $event.target.value)" type="number" step="1" title="Current liters in stock" class="h-8 w-16 px-2 rounded-lg bg-black/40 border border-white/12 ob-mono text-[10px] outline-none" />
+            <input :value="stock.maxLiters" @change="updateStockField(stock, 'maxLiters', $event.target.value)" type="number" step="1" title="Max tank capacity in liters" class="h-8 w-16 px-2 rounded-lg bg-black/40 border border-white/12 ob-mono text-[10px] outline-none" />
+            <button @click="removeStock(stock)" title="Remove this fuel type" class="ob-mono text-[9px] px-1.5 py-1 rounded border border-white/12 text-red-300 hover:bg-red-500/10">X</button>
           </div>
           <div class="flex items-center gap-1.5 mt-2">
-            <select v-model="stockDraft.fuelTypeId" class="h-8 px-2 rounded-lg bg-black/40 border border-white/12 text-[10px] outline-none flex-1">
+            <select v-model="stockDraft.fuelTypeId" title="Fuel type" class="h-8 px-2 rounded-lg bg-black/40 border border-white/12 text-[10px] outline-none flex-1">
               <option value="">Fuel type…</option>
               <option v-for="ft in fuelTypes" :key="ft.id" :value="ft.id">{{ ft.name }}</option>
             </select>
-            <input v-model.number="stockDraft.pricePerLiter" type="number" step="0.01" placeholder="$/L" class="h-8 w-16 px-2 rounded-lg bg-black/40 border border-white/12 ob-mono text-[10px] outline-none" />
-            <input v-model.number="stockDraft.currentLiters" type="number" step="1" placeholder="Cur" class="h-8 w-16 px-2 rounded-lg bg-black/40 border border-white/12 ob-mono text-[10px] outline-none" />
-            <input v-model.number="stockDraft.maxLiters" type="number" step="1" placeholder="Max" class="h-8 w-16 px-2 rounded-lg bg-black/40 border border-white/12 ob-mono text-[10px] outline-none" />
-            <button @click="addStock" class="ob-mono text-[9px] px-1.5 py-1 rounded border border-white/12 hover:bg-white/8">ADD</button>
+            <input v-model.number="stockDraft.pricePerLiter" type="number" step="0.01" placeholder="$/L" title="Price per liter" class="h-8 w-16 px-2 rounded-lg bg-black/40 border border-white/12 ob-mono text-[10px] outline-none" />
+            <input v-model.number="stockDraft.currentLiters" type="number" step="1" placeholder="Cur L" title="Current liters in stock" class="h-8 w-16 px-2 rounded-lg bg-black/40 border border-white/12 ob-mono text-[10px] outline-none" />
+            <input v-model.number="stockDraft.maxLiters" type="number" step="1" placeholder="Max L" title="Max tank capacity in liters" class="h-8 w-16 px-2 rounded-lg bg-black/40 border border-white/12 ob-mono text-[10px] outline-none" />
+            <button @click="addStock" title="Add this fuel type to the station" class="ob-mono text-[9px] px-1.5 py-1 rounded border border-white/12 hover:bg-white/8">ADD</button>
           </div>
         </div>
 
