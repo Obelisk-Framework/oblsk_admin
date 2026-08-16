@@ -16,7 +16,17 @@ end)
 
 Obelisk.onClient('admin:server:items-update', function(player, data)
     if not isAdmin(player) then return end
-    ItemService.updateBaseItem(data.baseItemId, data.attributes or {})
+    local attributes = data.attributes or {}
+    -- The admin UI sends the sentinel string '__clear__' for
+    -- base_item_category_id when "None" is selected, since a JSON
+    -- null round-trips as Lua nil and ItemService.updateBaseItem's
+    -- whitelist loop treats a nil value as "field not provided" (no-op),
+    -- not "clear this column". Translate the sentinel to Database.NULL,
+    -- the sentinel QueryBuilder:update already understands.
+    if attributes.base_item_category_id == '__clear__' then
+        attributes.base_item_category_id = Database.NULL
+    end
+    ItemService.updateBaseItem(data.baseItemId, attributes)
     replyWithList(player)
 end)
 
@@ -64,7 +74,10 @@ end)
 
 Obelisk.onClient('admin:server:categories-update', function(player, data)
     if not isAdmin(player) then return end
-    ItemService.updateCategory(data.categoryId, data.attributes or {})
+    local ok, reason = ItemService.updateCategory(data.categoryId, data.attributes or {})
+    if not ok then
+        NotificationService.error(player, 'Items', reason)
+    end
     replyWithCategories(player)
 end)
 

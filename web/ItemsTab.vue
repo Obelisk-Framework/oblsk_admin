@@ -41,7 +41,7 @@ onBeforeUnmount(() => Obelisk.off('admin:client:categories-reply', onCategoriesR
 
 const selectedCategory = computed(() => categories.value.find(c => c.id === selected.value?.base_item_category_id) || null)
 const categoryFieldValues = ref({})
-watch(selectedCategory, (cat) => {
+watch(() => [selected.value?.id, selectedCategory.value], ([, cat]) => {
   const data = selected.value?.data ? JSON.parse(selected.value.data) : {}
   categoryFieldValues.value = {}
   for (const f of (cat?.fields || [])) categoryFieldValues.value[f.name] = data[f.name] ?? ''
@@ -115,7 +115,7 @@ const submitGive = () => {
 
       <div>
         <div class="ob-mono text-[9px] tracking-[0.2em] text-white/30 uppercase mb-1.5">Category</div>
-        <select :value="selected.base_item_category_id" @change="updateField(selected, 'base_item_category_id', Number($event.target.value) || null)"
+        <select :value="selected.base_item_category_id" @change="updateField(selected, 'base_item_category_id', $event.target.value ? Number($event.target.value) : '__clear__')"
           class="w-full h-9 px-3 rounded-lg bg-black/40 border border-white/12 text-[11.5px] outline-none">
           <option :value="null">None</option>
           <option v-for="c in categories" :key="c.id" :value="c.id">{{ c.name }}</option>
