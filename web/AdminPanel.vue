@@ -8,11 +8,12 @@ import ModerationTab from './ModerationTab.vue'
 import VehiclesTab from './VehiclesTab.vue'
 import ItemsTab from './ItemsTab.vue'
 import FishingTab from '../../oblsk_fishing/web/FishingTab.vue'
+import PrintersTab from './PrintersTab.vue'
 
 const TABS = [
   ['players', 'Players'], ['moderation', 'Moderation'], ['organisations', 'Organisations'],
   ['vehicles', 'Vehicles'], ['interactions', 'Interactions'], ['blips', 'Blips'],
-  ['locations', 'Locations'], ['items', 'Items'], ['fishing', 'Fishing'], ['economy', 'Economy'],
+  ['locations', 'Locations'], ['items', 'Items'], ['fishing', 'Fishing'], ['printers', 'Printers'], ['economy', 'Economy'],
   ['server', 'Server'], ['audit', 'Audit log'],
 ]
 
@@ -49,6 +50,7 @@ const close = () => Obelisk.emit('admin:client:close-panel', {})
       <VehiclesTab v-else-if="activeTab === 'vehicles'" />
       <ItemsTab v-else-if="activeTab === 'items'" />
       <FishingTab v-else-if="activeTab === 'fishing'" />
+      <PrintersTab v-else-if="activeTab === 'printers'" />
       <ComingSoon v-else :label="TABS.find(([k]) => k === activeTab)[1]" />
     </div>
   </div>
