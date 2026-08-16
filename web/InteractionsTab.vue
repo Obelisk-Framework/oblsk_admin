@@ -60,6 +60,10 @@ const linkOwnerType = ref('')
 const linkOwnerCandidates = ref([]) // items[] for whatever ownerType is currently picked
 const linkOwnerId = ref('')
 
+// Safe "recent activity" (bespoke, read-only, fetched on select) - see
+// selectItem() and the template block below.
+const safeTransactions = ref([])
+
 const round = (n) => (typeof n === 'number' ? Math.round(n * 10) / 10 : n)
 
 const DEV_TYPES = [
@@ -106,6 +110,10 @@ const DEV_TYPE_ITEMS = {
 }
 const DEV_FUEL_TYPES = [{ id: 1, name: 'Regular' }, { id: 2, name: 'Diesel' }]
 const DEV_ORGS = [{ id: 1, name: 'City Works' }]
+const DEV_SAFE_TRANSACTIONS = [
+  { id: 1, type: 'withdrawal', amount: 320, characterName: 'K. West', createdAt: Math.floor(Date.now() / 1000) - 3600 },
+  { id: 2, type: 'crack', amount: 640, characterName: null, createdAt: Math.floor(Date.now() / 1000) - 90000 },
+]
 
 const onTypesReply = ({ types: next }) => { interactionTypes.value = next }
 const onTypeItemsReply = ({ typeKey, items }) => { typeItems.value = { ...typeItems.value, [typeKey]: items } }
@@ -114,6 +122,10 @@ const onOrgsReply = ({ orgs: next }) => { orgs.value = next }
 const onSafeOwnerCandidatesReply = ({ ownerType, items }) => {
   if (ownerType !== linkOwnerType.value) return // stale reply for a since-changed picker
   linkOwnerCandidates.value = items
+}
+const onSafeTransactionsReply = ({ safeId, transactions }) => {
+  if (!selectedItem.value || selectedItem.value.typeKey !== 'safe' || selectedItem.value.id !== safeId) return // stale reply for a since-changed selection
+  safeTransactions.value = transactions
 }
 
 const fetchTypeItems = (typeKey) => {
@@ -147,6 +159,7 @@ onMounted(() => {
   Obelisk.on('admin:client:gasstation-fuelTypes-reply', onFuelTypesReply)
   Obelisk.on('admin:client:organisations-reply', onOrgsReply)
   Obelisk.on('admin:client:safe-ownerCandidates-reply', onSafeOwnerCandidatesReply)
+  Obelisk.on('admin:client:safe-transactions-reply', onSafeTransactionsReply)
   fetchAll()
 })
 onBeforeUnmount(() => {
@@ -155,6 +168,7 @@ onBeforeUnmount(() => {
   Obelisk.off('admin:client:gasstation-fuelTypes-reply', onFuelTypesReply)
   Obelisk.off('admin:client:organisations-reply', onOrgsReply)
   Obelisk.off('admin:client:safe-ownerCandidates-reply', onSafeOwnerCandidatesReply)
+  Obelisk.off('admin:client:safe-transactions-reply', onSafeTransactionsReply)
 })
 
 const registry = inject('obelisk:globalElementsRegistry', null)
@@ -182,6 +196,11 @@ function selectItem(item) {
   selectedKey.value = keyOf(item)
   createStep.value = null
   typeCreateDraft.value = null
+  safeTransactions.value = []
+  if (item.typeKey === 'safe') {
+    if (import.meta.env.DEV) { safeTransactions.value = DEV_SAFE_TRANSACTIONS; return }
+    Obelisk.emit('admin:client:safe-transactions-list', { safeId: item.id })
+  }
 }
 
 // --- Create flow: pick a strategy first, then fill its form ---
@@ -437,6 +456,22 @@ const unlinkOwner = (owner) => {
               <option v-for="c in linkOwnerCandidates" :key="c.id" :value="c.id">{{ c.name || c.label }}</option>
             </select>
             <button @click="linkOwner" title="Link this station to the safe" class="ob-mono text-[9px] px-1.5 py-1 rounded border border-white/12 hover:bg-white/8">LINK</button>
+          </div>
+
+          <!-- Read-only audit log. Withdrawals show who (legit, org-gated);
+               a cracked payout never has an actor to show - see
+               oblsk_safe's safe_transactions migration comment, the name is
+               never even written to the DB, not just hidden here. -->
+          <div class="mt-3 pt-3 border-t border-white/8">
+            <div class="ob-mono text-[9px] tracking-[0.2em] text-white/30 uppercase mb-1.5">Recent activity</div>
+            <div v-if="!safeTransactions.length" class="text-[11px] text-white/35">No activity yet.</div>
+            <div v-for="tx in safeTransactions" :key="tx.id" class="flex items-center justify-between ob-mono text-[10px] text-white/45 mb-1">
+              <span>
+                <span class="uppercase" :style="{ color: tx.type === 'crack' ? '#f87171' : tx.type === 'withdrawal' ? 'var(--ob-accent)' : 'rgba(255,255,255,.35)' }">{{ tx.type }}</span>
+                {{ tx.type === 'withdrawal' ? '· ' + (tx.characterName || 'unknown member') : tx.type === 'crack' ? '· unknown (stolen)' : '' }}
+              </span>
+              <span>{{ tx.amount }}</span>
+            </div>
           </div>
         </div>
 

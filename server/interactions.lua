@@ -88,6 +88,14 @@ Obelisk.onClient('admin:server:safe-ownerCandidates-list', function(player, data
     player:emit('admin:client:safe-ownerCandidates-reply', { ownerType = data.ownerType, items = descriptor.list() })
 end)
 
+--- Read-only transaction history for the selected safe's detail panel -
+--- fetched on demand (not folded into listStationsForAdmin's payload) since
+--- it's only ever needed once an admin actually has a safe selected.
+Obelisk.onClient('admin:server:safe-transactions-list', function(player, data)
+    if not isAdmin(player) then return end
+    player:emit('admin:client:safe-transactions-reply', { safeId = data.safeId, transactions = SafeService.listTransactions(data.safeId) })
+end)
+
 --------------------------------------------------------------------------------
 -- Generic interaction types - dynamic replacement for the old bespoke
 -- gasstation-*/mechanic-* CRUD handlers above. Any plugin that has called
