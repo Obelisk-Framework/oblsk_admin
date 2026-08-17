@@ -18,7 +18,7 @@
 --- Shop.vue/Garage.vue do for their own panels.
 local panelOpen = false
 
-Obelisk.onClient('admin:client:toggle-panel', function()
+Obelisk.onServer('admin:client:toggle-panel', function()
     if panelOpen and not IsNuiFocused() then
         panelOpen = false
     end
@@ -57,7 +57,7 @@ for _, name in ipairs(ORG_RELAYS) do
     end)
 end
 
-Obelisk.onClient('admin:client:organisations-reply', function(payload)
+Obelisk.onServer('admin:client:organisations-reply', function(payload)
     SendNUIMessage({ eventname = 'admin:client:organisations-reply', args = { payload } })
 end)
 
@@ -98,7 +98,7 @@ local TAB_REPLIES = {
     'safe-ownerCandidates-reply', 'safe-transactions-reply',
 }
 for _, name in ipairs(TAB_REPLIES) do
-    Obelisk.onClient('admin:client:' .. name, function(payload)
+    Obelisk.onServer('admin:client:' .. name, function(payload)
         SendNUIMessage({ eventname = 'admin:client:' .. name, args = { payload } })
     end)
 end
