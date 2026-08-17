@@ -1,5 +1,5 @@
 node_modules/
 .env
 
-# Server-local config override (see shared/config.lua.example)
-shared/config.lua
+# Server-local config override (see shared/AdminConfig.lua.example)
+shared/AdminConfig.lua

@@ -25,8 +25,7 @@ Obelisk.onServer('admin:client:toggle-panel', function()
 
     panelOpen = not panelOpen
     if panelOpen then
-        WebView.openPage('/Admin')
-        WebView.focus()
+        WebView.openFor('/Admin')
         WebView.emit('admin:client:panel-open', {})
     else
         WebView.emit('admin:client:panel-close', {})
