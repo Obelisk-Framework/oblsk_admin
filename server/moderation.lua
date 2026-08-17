@@ -9,7 +9,7 @@ local function isAdmin(player)
 end
 
 local function accountExists(accountId)
-    return Account:findSync(accountId) ~= nil
+    return Account:find(accountId) ~= nil
 end
 
 local function replyWithLists(player)
