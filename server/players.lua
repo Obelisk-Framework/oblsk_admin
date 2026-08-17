@@ -12,7 +12,7 @@ local function listPlayers()
     for _, playerIdStr in ipairs(GetPlayers()) do
         local playerId = tonumber(playerIdStr)
         local characterId = CharacterService.sessionCharacters[playerId]
-        local character = characterId and Character:findSync(characterId)
+        local character = characterId and Character:find(characterId)
         local coords = GetEntityCoords(GetPlayerPed(playerId))
 
         table.insert(rows, {
