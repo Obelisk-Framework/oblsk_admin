@@ -69,6 +69,8 @@ local TAB_RELAYS = {
     'vehicles-list', 'vehicles-delete', 'vehicles-teleport-to-admin',
     'baseVehicles-list', 'baseVehicles-create', 'baseVehicles-update', 'baseVehicles-delete', 'baseVehicles-fuelTypes-list',
     'items-list', 'items-update', 'items-create', 'items-give',
+    'categories-list', 'categories-create', 'categories-update', 'categories-delete',
+    'items-update-category-data',
     'items-icon-upload-mint',
     'items-bindings-list', 'items-bindings-set', 'items-bindings-clear',
     'items-actions-list', 'items-update-actions',
@@ -89,7 +91,7 @@ for _, name in ipairs(TAB_RELAYS) do
 end
 
 local TAB_REPLIES = {
-    'players-reply', 'moderation-reply', 'vehicles-reply', 'items-reply', 'printers-reply', 'jobs-reply', 'jobs-detail-reply', 'scheduler-reply',
+    'players-reply', 'moderation-reply', 'vehicles-reply', 'items-reply', 'categories-reply', 'printers-reply', 'jobs-reply', 'jobs-detail-reply', 'scheduler-reply',
     'gasstation-fuelTypes-reply',
     'baseVehicles-reply', 'baseVehicles-fuelTypes-reply',
     'interactionTypes-reply', 'interactionType-reply',

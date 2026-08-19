@@ -81,6 +81,24 @@ const FLAG_LABELS = {
   is_stackable: 'Stackable',
 }
 
+const categories = ref([])
+const onCategoriesReply = ({ categories: next }) => { categories.value = next }
+onMounted(() => { Obelisk.on('admin:client:categories-reply', onCategoriesReply); Obelisk.emit('admin:client:categories-list', {}) })
+onBeforeUnmount(() => Obelisk.off('admin:client:categories-reply', onCategoriesReply))
+
+const selectedCategory = computed(() => categories.value.find(c => c.id === selected.value?.base_item_category_id) || null)
+const categoryFieldValues = ref({})
+watch(() => [selected.value?.id, selectedCategory.value], ([, cat]) => {
+  const data = selected.value?.data ? JSON.parse(selected.value.data) : {}
+  categoryFieldValues.value = {}
+  for (const f of (cat?.fields || [])) categoryFieldValues.value[f.name] = data[f.name] ?? ''
+})
+
+const setCategoryFieldValue = (name, value) => { categoryFieldValues.value[name] = value }
+const saveCategoryData = () => {
+  Obelisk.emit('admin:client:items-update-category-data', { baseItemId: selected.value.id, values: categoryFieldValues.value })
+}
+
 const updateField = (item, field, value) => {
   Obelisk.emit('admin:client:items-update', { baseItemId: item.id, attributes: { [field]: value } })
 }
@@ -246,6 +264,42 @@ const updateActionData = (item, index, text) => {
             <input ref="iconFileInput" type="file" accept="image/png,image/webp" class="hidden" @change="onIconFileSelected" />
           </div>
         </div>
+      </div>
+
+      <div>
+        <div class="ob-mono text-[9px] tracking-[0.2em] text-white/30 uppercase mb-1.5">Category</div>
+        <select :value="selected.base_item_category_id" @change="updateField(selected, 'base_item_category_id', $event.target.value ? Number($event.target.value) : '__clear__')"
+          class="w-full h-9 px-3 rounded-lg bg-black/40 border border-white/12 text-[11.5px] outline-none">
+          <option :value="null">None</option>
+          <option v-for="c in categories" :key="c.id" :value="c.id">{{ c.name }}</option>
+        </select>
+      </div>
+
+      <div v-if="selectedCategory" class="space-y-2">
+        <div v-for="f in selectedCategory.fields" :key="f.name">
+          <div class="ob-mono text-[9px] tracking-[0.2em] text-white/30 uppercase mb-1">{{ f.name }}{{ f.required ? ' *' : '' }}</div>
+          <input v-if="f.type === 'text' || f.type === 'number'" :type="f.type" :value="categoryFieldValues[f.name]"
+            @change="setCategoryFieldValue(f.name, $event.target.value)"
+            class="w-full h-9 px-3 rounded-lg bg-black/40 border border-white/12 text-[11.5px] outline-none" />
+          <input v-else-if="f.type === 'boolean'" type="checkbox" :checked="!!categoryFieldValues[f.name]"
+            @change="setCategoryFieldValue(f.name, $event.target.checked)" />
+          <select v-else-if="f.type === 'select'" :value="categoryFieldValues[f.name]"
+            @change="setCategoryFieldValue(f.name, $event.target.value)"
+            class="w-full h-9 px-3 rounded-lg bg-black/40 border border-white/12 text-[11.5px] outline-none">
+            <option v-for="opt in f.options" :key="opt" :value="opt">{{ opt }}</option>
+          </select>
+        </div>
+        <button @click="saveCategoryData" class="h-8 px-3 rounded-lg text-black text-[11px] font-medium" style="background: var(--ob-accent)">Save category fields</button>
+      </div>
+
+      <div class="flex items-center justify-between py-1.5">
+        <span class="ob-mono text-[10px] uppercase tracking-wide text-white/35">Kept after respawn</span>
+        <button @click="updateField(selected, 'is_kept_after_respawn', selected.is_kept_after_respawn ? 0 : 1)"
+          class="ob-mono text-[9px] px-2 py-1 rounded border"
+          :class="selected.is_kept_after_respawn ? 'border-white/30 text-black font-medium' : 'border-white/12 text-white/40'"
+          :style="selected.is_kept_after_respawn ? { background: 'var(--ob-accent)' } : undefined">
+          {{ selected.is_kept_after_respawn ? 'YES' : 'NO' }}
+        </button>
       </div>
 
       <div>

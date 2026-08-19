@@ -8,6 +8,7 @@ import PlayersTab from './PlayersTab.vue'
 import ModerationTab from './ModerationTab.vue'
 import VehiclesTab from './VehiclesTab.vue'
 import ItemsTab from './ItemsTab.vue'
+import CategoriesTab from './CategoriesTab.vue'
 import InteractionsTab from './InteractionsTab.vue'
 import JobsTab from './JobsTab.vue'
 import SchedulerTab from './SchedulerTab.vue'
@@ -18,7 +19,7 @@ import PrintersTab from './PrintersTab.vue'
 const TABS = [
   ['players', 'Players'], ['moderation', 'Moderation'], ['organisations', 'Organisations'],
   ['vehicles', 'Vehicles'], ['interactions', 'Interactions'], ['blips', 'Blips'],
-  ['locations', 'Locations'], ['items', 'Items'], ['jobs', 'Jobs'], ['scheduler', 'Scheduler'], ['fishing', 'Fishing'], ['hunting', 'Hunting'], ['printers', 'Printers'], ['economy', 'Economy'],
+  ['locations', 'Locations'], ['items', 'Items'], ['categories', 'Categories'], ['jobs', 'Jobs'], ['scheduler', 'Scheduler'], ['fishing', 'Fishing'], ['hunting', 'Hunting'], ['printers', 'Printers'], ['economy', 'Economy'],
   ['server', 'Server'], ['audit', 'Audit log'],
 ]
 
@@ -89,6 +90,7 @@ onBeforeUnmount(() => {
       <ModerationTab v-else-if="activeTab === 'moderation'" />
       <VehiclesTab v-else-if="activeTab === 'vehicles'" />
       <ItemsTab v-else-if="activeTab === 'items'" />
+      <CategoriesTab v-else-if="activeTab === 'categories'" />
       <JobsTab v-else-if="activeTab === 'jobs'" />
       <SchedulerTab v-else-if="activeTab === 'scheduler'" />
       <FishingTab v-else-if="activeTab === 'fishing'" />
